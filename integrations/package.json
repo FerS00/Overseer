@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "type": "module",
+  "main": "./integrations.test.mjs",
+  "scripts": {
+    "test": "node --test ./integrations.test.mjs"
+  }
+}

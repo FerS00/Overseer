@@ -1,0 +1,32 @@
+services:
+  agent-ops:
+    build: .
+    container_name: agent-ops
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${AGENT_OPS_PORT:-8787}:8787"
+    env_file:
+      - .env
+    environment:
+      AGENT_OPS_BIND: 0.0.0.0
+      AGENT_OPS_DB_URL: ${AGENT_OPS_DOCKER_DB_URL:-jdbc:h2:file:/app/data/agentops;AUTO_SERVER=TRUE}
+      AGENT_OPS_DB_USER: ${AGENT_OPS_DOCKER_DB_USER:-sa}
+      AGENT_OPS_DB_PASS: ${AGENT_OPS_DOCKER_DB_PASS:-}
+      AGENT_OPS_DB_DRIVER: ${AGENT_OPS_DOCKER_DB_DRIVER:-org.h2.Driver}
+      AGENT_OPS_EVENTS_FILE: /events/events.ndjson
+      AGENT_OPS_TOKEN_FILE: ${AGENT_OPS_TOKEN_FILE:-/events/token}
+      AGENT_OPS_CODEX_SESSIONS: /codex-sessions
+      AGENT_OPS_CODEX_WATCHER_ENABLED: ${AGENT_OPS_CODEX_WATCHER_ENABLED:-true}
+    volumes:
+      - "${AGENT_OPS_EVENTS_DIR:-./.agent-ops}:/events"
+      - "${AGENT_OPS_CODEX_SESSIONS_DIR:-./.codex-sessions}:/codex-sessions:ro"
+      - agent-ops-data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8787/api/diagnostics >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  agent-ops-data:

@@ -1,0 +1,875 @@
+<title>Overseer Mascotas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: cabecera con Vigía (mascota del proyecto), escenario con dos cabinas (Claude Code y Codex) y línea de tiempo.
+   Diseño solo oscuro: todos los colores se definen en :root y no hay tema claro. */
+:root {
+  color-scheme: dark;
+  --bg: #0A0D14; --bg-glow: #121733; --surface: #11151F; --surface-2: #171C29; --stage: #0D1119;
+  --line: #222A3B; --line-strong: #6E7A96;
+  --fg: #E8ECF4; --muted: #98A2B8;
+  --brand: #A99BFF; --on-brand: #0A0D14; --ring: #C9C2FF;
+  --claude: #EE8B66; --codex: #E6EDF5; --codex-accent: #8FA2FF;
+  --ok: #4ADE80; --warn: #FBBF24; --bad: #F87171;
+  --shadow: rgba(0,0,0,.55);
+  /* cuerpos de mascota */
+  --vigia-body: #8B7CF6; --vigia-glass: #1B1838; --vigia-iris: #C9C2FF;
+  --spark: #D97757; --spark-hot: #F0A07E; --spark-face: #D97757; --spark-eye: #1A1210; --spark-pupil: #1A1210;
+  --knot: #8FA2FF; --knot-dim: #7C8698; --knot-glow: #8FA2FF; --screen: #04110F; --led: #8FA2FF;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+  --r-md: 14px; --r-lg: 22px;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: radial-gradient(900px 420px at 15% -10%, var(--bg-glow), transparent 70%), var(--bg); color: var(--fg); font: 400 16px/1.5 var(--font-body); min-height: 100vh; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 48px; display: grid; gap: 20px; }
+h1, h2 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+button { font: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; border-radius: 6px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- cabecera ---------- */
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+.brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.brand svg { width: 84px; height: 98px; flex: none; overflow: visible; cursor: pointer; }
+.brand h1 { font-size: clamp(1.6rem, 1.2rem + 1.6vw, 2.3rem); font-weight: 800; letter-spacing: -.02em; line-height: 1.05; }
+.brand p { margin: 4px 0 0; color: var(--muted); max-width: 46ch; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 999px;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--fg); font-weight: 500; transition: background .18s; }
+.btn:hover { background: var(--surface-2); }
+.btn[aria-pressed="true"] { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
+.conn { display: inline-flex; align-items: center; gap: 8px; font: 600 .8rem var(--font-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.conn::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+
+/* ---------- escenario ---------- */
+.stage { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.pod { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 18px; display: grid; gap: 14px; min-width: 0; }
+.pod-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.pod-name { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.pod-name h2 { font-size: 1.35rem; font-weight: 700; }
+.pod-name span { font: 400 .8rem var(--font-mono); color: var(--muted); }
+.pod[data-agent="claude"] .pod-name h2 { color: var(--claude); }
+.pod[data-agent="codex"] .pod-name h2 { color: var(--codex); }
+
+.pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--surface-2); font: 600 .8rem var(--font-mono); letter-spacing: .04em; }
+.pill i { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.pill[data-s="thinking"] i { background: var(--brand); }
+.pill[data-s="read"] i, .pill[data-s="edit"] i, .pill[data-s="run"] i, .pill[data-s="done"] i { background: var(--ok); }
+.pill[data-s="permission"] i { background: var(--warn); animation: pulse 1s ease-in-out infinite; }
+.pill[data-s="error"] i { background: var(--bad); }
+
+.floor { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 16px; align-items: center; border-radius: var(--r-md); padding: 10px 14px; background: var(--stage); border: 1px solid var(--line); }
+.pod[data-agent="claude"] .floor { background: radial-gradient(140px 110px at 95px 50%, rgba(217,119,87,.16), transparent 75%), var(--stage); }
+.pod[data-agent="codex"] .floor { background: radial-gradient(140px 110px at 95px 50%, rgba(143,162,255,.14), transparent 75%), var(--stage); }
+.floor svg { width: 190px; height: 190px; overflow: visible; cursor: pointer; touch-action: manipulation; }
+.now { min-width: 0; display: grid; gap: 4px; }
+.now .label { font: 600 .72rem var(--font-mono); text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+.now .title { font-weight: 600; font-size: 1.05rem; overflow-wrap: anywhere; }
+.now .detail { font: 400 .85rem/1.45 var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }
+.meta { display: flex; gap: 14px; flex-wrap: wrap; font: 400 .8rem var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; margin-top: 6px; }
+
+.try { display: grid; gap: 8px; }
+.try > span { font: 600 .72rem var(--font-mono); text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+.states { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line-strong); background: transparent; color: var(--fg); font-size: .85rem; }
+.chip:hover { background: var(--surface-2); }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.pod-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.note { color: var(--muted); font-size: .85rem; margin: 0; }
+
+/* ---------- línea de tiempo ---------- */
+.timeline { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 18px; display: grid; gap: 12px; min-width: 0; }
+.timeline header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.timeline h2 { font-size: 1.15rem; }
+.timeline header span { color: var(--muted); font-size: .85rem; }
+.feed { list-style: none; margin: 0; padding: 0; display: grid; }
+.feed li { display: grid; grid-template-columns: 72px 112px minmax(0, 1fr); gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); align-items: baseline; }
+.feed li:first-child { border-top: 0; }
+.feed li.new { animation: slidein .35s ease-out; }
+.feed time { font: 400 .8rem var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.feed .who { font: 600 .8rem var(--font-mono); }
+.feed .who[data-a="claude"] { color: var(--claude); }
+.feed .who[data-a="codex"] { color: var(--codex-accent); }
+.feed .what { overflow-wrap: anywhere; font-size: .92rem; }
+.feed .what code { font: 400 .82rem var(--font-mono); color: var(--muted); }
+
+/* ---------- mascotas ---------- */
+.m-breathe { animation: breathe 3.6s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
+.lid { transform-box: fill-box; transform-origin: 50% 0; transform: scaleY(0); transition: transform .09s ease-in; }
+.blink .lid { transform: scaleY(1); }
+.prop, .qbubble, .zz, .sparks, .orbit { opacity: 0; transition: opacity .2s; }
+[data-state="read"] .prop-read, [data-state="edit"] .prop-edit, [data-state="run"] .prop-run { opacity: 1; animation: bob 1.1s ease-in-out infinite; }
+[data-state="permission"] .qbubble { opacity: 1; animation: bob .8s ease-in-out infinite; }
+[data-state="sleeping"] .zz { opacity: 1; }
+[data-state="sleeping"] .zz text { animation: zz 2.6s ease-in-out infinite; }
+[data-state="sleeping"] .zz text:nth-child(2) { animation-delay: 1.3s; }
+[data-state="done"] .sparks { opacity: 1; }
+[data-state="done"] .sparks > * { animation: twinkle 1.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+[data-state="error"] .shake { animation: shake .45s ease-in-out 2; }
+[data-state="thinking"] .orbit { opacity: 1; }
+.orbit g { transform-origin: 70px 72px; animation: orbit 2.4s linear infinite; }
+.float { animation: float 3.2s ease-in-out infinite; }
+.glitch { animation: glitch .32s steps(2) 1; }
+.beam { transition: opacity .4s; }
+.knot rect { transition: stroke .35s; }
+
+@keyframes breathe { 0%,100% { transform: scale(1,1); } 50% { transform: scale(1.015,.985); } }
+@keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes zz { 0% { opacity: 0; transform: translate(0,0); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(8px,-18px); } }
+@keyframes twinkle { 0%,100% { transform: scale(.6); opacity: .4; } 50% { transform: scale(1.1); opacity: 1; } }
+@keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+@keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes orbit { to { transform: rotate(360deg); } }
+@keyframes glitch { 0% { transform: translate(-3px,1px); filter: hue-rotate(60deg); } 50% { transform: translate(3px,-1px); filter: hue-rotate(-60deg); } 100% { transform: none; filter: none; } }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes slidein { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+.calm *, .calm *::before, .calm *::after { animation: none !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
+
+.envelope { position: fixed; left: 0; top: 0; width: 34px; height: 26px; pointer-events: none; z-index: 10; }
+
+@media (max-width: 860px) { .stage { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 460px) {
+  .floor { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; }
+  .meta { justify-content: center; }
+  .feed li { grid-template-columns: 64px minmax(0, 1fr); }
+  .feed .what { grid-column: 1 / -1; }
+  .brand svg { width: 64px; height: 76px; }
+}
+
+/* Chispa: pixel art terracota */
+.chispa.px { shape-rendering: crispEdges; overflow: visible; }
+.chispa .body { fill: #D97757; }
+.chispa .shade { fill: #B85F42; }
+.chispa .eye { fill: #1A1210; }
+.chispa .whole { transform-box: fill-box; transform-origin: 50% 100%; }
+.chispa .eyes { transition: transform .12s steps(1); }
+.chispa .prop, .chispa .fx { display: none; }
+.chispa .eye-happy, .chispa .eye-x, .chispa .eye-shut { display: none; }
+.chispa[data-state='idle'] .whole { animation: chispa-bob 2.4s steps(2) infinite; }
+.chispa[data-state='thinking'] .eyes { transform: translateY(-1px); }
+.chispa[data-state='thinking'] .fx-think { display: inline; }
+.chispa[data-state='thinking'] .fx-think rect { animation: mascot-dot 1.2s steps(1) infinite; }
+.chispa[data-state='thinking'] .fx-think rect:nth-child(2) { animation-delay: .2s; }
+.chispa[data-state='thinking'] .fx-think rect:nth-child(3) { animation-delay: .4s; }
+.chispa[data-state='reading'] .prop-book { display: inline; }
+.chispa[data-state='reading'] .eyes { animation: chispa-scan 1.6s steps(1) infinite; }
+.chispa[data-state='editing'] .prop-pencil { display: inline; }
+.chispa[data-state='editing'] .arm-r { animation: chispa-scribble .5s steps(2) infinite; }
+.chispa[data-state='running'] .legs-a { animation: chispa-walk-a .4s steps(1) infinite; }
+.chispa[data-state='running'] .legs-b { animation: chispa-walk-b .4s steps(1) infinite; }
+.chispa[data-state='running'] .fx-run { display: inline; animation: mascot-blink .4s steps(1) infinite; }
+.chispa[data-state='permission'] .arm-r { animation: chispa-wave .6s steps(2) infinite; }
+.chispa[data-state='permission'] .fx-ask { display: inline; }
+.chispa[data-state='done'] .whole { animation: chispa-hop .8s steps(4) infinite; }
+.chispa[data-state='done'] .eye-open { display: none; }
+.chispa[data-state='done'] .eye-happy { display: inline; }
+.chispa[data-state='done'] .fx-spark { display: inline; animation: mascot-blink .5s steps(1) infinite; }
+.chispa[data-state='error'] .whole { animation: chispa-shake .25s steps(2) infinite; }
+.chispa[data-state='error'] .body { fill: #C2665A; }
+.chispa[data-state='error'] .eye-open { display: none; }
+.chispa[data-state='error'] .eye-x { display: inline; }
+.chispa[data-state='sleeping'] .eye-open { display: none; }
+.chispa[data-state='sleeping'] .eye-shut { display: inline; }
+.chispa[data-state='sleeping'] .legs-a, .chispa[data-state='sleeping'] .legs-b { display: none; }
+.chispa[data-state='sleeping'] .upper { transform: translateY(4px); }
+.chispa[data-state='sleeping'] .fx-zz { display: inline; animation: mascot-float 2.4s steps(4) infinite; }
+
+/* Nodo: nube festoneada con >_ */
+.nodo .gaze, .nodo .cloud { transform-box: fill-box; transform-origin: center; }
+.nodo .glyph { fill: none; stroke: #fff; stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; }
+.nodo .glyph-fill { fill: #fff; }
+.nodo .face > g { display: none; }
+.nodo .face .f-idle { display: inline; }
+.nodo .cursor { animation: nodo-cursor 1.1s steps(1) infinite; }
+.nodo .stop-top { stop-color: #B2A6FF; }
+.nodo .stop-mid { stop-color: #7896FF; }
+.nodo .stop-bot { stop-color: #3346FF; }
+.nodo[data-state='idle'] .cloud { animation: nodo-breathe 3.2s ease-in-out infinite; }
+.nodo[data-state='thinking'] .cloud { animation: nodo-sway 3s ease-in-out infinite; }
+.nodo[data-state='thinking'] .face .f-idle { display: none; }
+.nodo[data-state='thinking'] .face .f-think { display: inline; }
+.nodo[data-state='thinking'] .f-think circle { animation: mascot-dot 1.2s steps(1) infinite; }
+.nodo[data-state='thinking'] .f-think circle:nth-child(2) { animation-delay: .2s; }
+.nodo[data-state='thinking'] .f-think circle:nth-child(3) { animation-delay: .4s; }
+.nodo[data-state='reading'] .chev { animation: nodo-look 1.6s ease-in-out infinite; }
+.nodo[data-state='editing'] .cursor { animation: nodo-type .45s steps(3) infinite; transform-box: fill-box; transform-origin: 0 50%; }
+.nodo[data-state='running'] .face .f-idle { display: none; }
+.nodo[data-state='running'] .face .f-run { display: inline; }
+.nodo[data-state='running'] .cloud { animation: nodo-sway .9s ease-in-out infinite; }
+.nodo[data-state='running'] .f-run .c2 { animation: mascot-blink .4s steps(1) infinite; }
+.nodo[data-state='permission'] .face .f-idle { display: none; }
+.nodo[data-state='permission'] .face .f-ask { display: inline; }
+.nodo[data-state='permission'] .stop-top { stop-color: #FFD27A; }
+.nodo[data-state='permission'] .stop-mid { stop-color: #F6A93B; }
+.nodo[data-state='permission'] .stop-bot { stop-color: #D9822B; }
+.nodo[data-state='permission'] .cloud { animation: nodo-wobble .9s ease-in-out infinite; }
+.nodo[data-state='done'] .face .f-idle { display: none; }
+.nodo[data-state='done'] .face .f-done { display: inline; }
+.nodo[data-state='done'] .cloud { animation: nodo-pop .9s ease-out infinite; }
+.nodo[data-state='error'] .face .f-idle { display: none; }
+.nodo[data-state='error'] .face .f-err { display: inline; }
+.nodo[data-state='error'] .stop-top { stop-color: #FFA3A3; }
+.nodo[data-state='error'] .stop-mid { stop-color: #F26B6B; }
+.nodo[data-state='error'] .stop-bot { stop-color: #C93A4A; }
+.nodo[data-state='error'] .cloud { animation: chispa-shake .2s steps(2) infinite; }
+.nodo[data-state='sleeping'] .face .f-idle { display: none; }
+.nodo[data-state='sleeping'] .face .f-sleep { display: inline; }
+.nodo[data-state='sleeping'] .stop-top { stop-color: #6F6A9A; }
+.nodo[data-state='sleeping'] .stop-mid { stop-color: #55608F; }
+.nodo[data-state='sleeping'] .stop-bot { stop-color: #36407A; }
+.nodo[data-state='sleeping'] .zz { display: inline; animation: mascot-float 2.4s ease-in-out infinite; }
+.nodo .zz { display: none; }
+.nodo.glitch .stop-top { stop-color: #FF84E8; }
+.nodo.glitch .stop-mid { stop-color: #63E8FF; }
+.nodo.glitch .stop-bot { stop-color: #5263FF; }
+.calm *, .calm *::before { animation: none !important; transition: none !important; }
+.chispa.calm .eyes { transform: translate(0, 0) !important; }
+.nodo.calm .face, .nodo.calm .gaze { transform: none !important; }
+@media (prefers-reduced-motion: reduce) { .chispa, .nodo { animation: none !important; transition: none !important; } }
+
+@keyframes chispa-bob { 50% { transform: translateY(-1px); } }
+@keyframes mascot-dot { 0% { opacity: .25; } 33% { opacity: 1; } 66% { opacity: .25; } }
+@keyframes chispa-scan { 0% { transform: translateX(-1px); } 50% { transform: translateX(1px); } }
+@keyframes chispa-scribble { 50% { transform: translateY(-1px); } }
+@keyframes chispa-walk-a { 50% { transform: translateY(-1px); } }
+@keyframes chispa-walk-b { 0% { transform: translateY(-1px); } 50% { transform: translateY(0); } }
+@keyframes chispa-wave { 0% { transform: translateY(-5px); } 50% { transform: translateY(-6px) translateX(1px); } }
+@keyframes chispa-hop { 0%,100% { transform: translateY(0); } 25% { transform: translateY(-2px); } 50% { transform: translateY(-3px); } 75% { transform: translateY(-1px); } }
+@keyframes chispa-shake { 50% { transform: translateX(1px); } }
+@keyframes mascot-blink { 50% { opacity: .2; } }
+@keyframes mascot-float { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-3px); opacity: .2; } }
+@keyframes nodo-cursor { 50% { opacity: 0; } }
+@keyframes nodo-breathe { 50% { transform: scale(1.03); } }
+@keyframes nodo-sway { 25% { transform: rotate(-8deg); } 75% { transform: rotate(8deg); } }
+@keyframes nodo-look { 50% { transform: translateX(6px); } }
+@keyframes nodo-type { 0% { transform: scaleX(.35); } 50% { transform: scaleX(.7); } 100% { transform: scaleX(1); } }
+@keyframes nodo-wobble { 25% { transform: rotate(-6deg); } 75% { transform: rotate(6deg); } }
+@keyframes nodo-pop { 0% { transform: scale(1); } 30% { transform: scale(1.1); } 100% { transform: scale(1); } }
+
+.floor svg:not(.v3-creature) { position: relative; }
+.floor svg.v3-creature { position: absolute; inset: 0; width: 100% !important; height: 100% !important; }
+#claude, #codex { position: relative; }
+#claude > *:not(.v3-creature), #codex > *:not(.v3-creature) { visibility: hidden; animation: none !important; }
+#claude > *:not(.v3-creature) *, #codex > *:not(.v3-creature) * { animation: none !important; }
+.calm #v3-chispa .eyes { transform: none !important; }
+.calm #v3-nodo .face, .calm #v3-nodo .gaze { transform: none !important; }
+</style>
+
+<div class="wrap" id="app">
+  <header class="top">
+    <div class="brand">
+      <!-- VIGÍA: mascota del proyecto. Faro con un único ojo-diafragma que sigue el puntero. -->
+      <svg id="vigia" viewBox="0 0 120 140" role="img" aria-label="Vigía, la mascota de Overseer, vigilando a los agentes">
+        <defs>
+          <linearGradient id="beamGrad" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stop-color="#C9C2FF" stop-opacity=".5"/>
+            <stop offset="1" stop-color="#C9C2FF" stop-opacity="0"/>
+          </linearGradient>
+          <clipPath id="vigiaHead"><circle cx="60" cy="50" r="22"/></clipPath>
+        </defs>
+        <path class="beam" id="vBeam" d="M60 50 L230 18 L230 82 Z" fill="url(#beamGrad)" opacity="0"/>
+        <ellipse cx="60" cy="133" rx="26" ry="5" fill="var(--shadow)"/>
+        <g class="m-breathe">
+          <ellipse cx="47" cy="127" rx="9" ry="5" fill="var(--vigia-body)"/>
+          <ellipse cx="73" cy="127" rx="9" ry="5" fill="var(--vigia-body)"/>
+          <rect x="34" y="62" width="52" height="64" rx="22" fill="var(--vigia-body)"/>
+          <rect x="44" y="86" width="32" height="26" rx="10" fill="rgba(255,255,255,.16)"/>
+          <circle id="vLedClaude" cx="53" cy="99" r="4.5" fill="#3A4256"/>
+          <circle id="vLedCodex" cx="67" cy="99" r="4.5" fill="#3A4256"/>
+          <path d="M40 30 L60 14 L80 30 Z" fill="var(--vigia-body)" stroke="var(--vigia-body)" stroke-width="6" stroke-linejoin="round"/>
+          <circle id="vBulb" cx="60" cy="9" r="4" fill="#C9C2FF"/>
+          <circle cx="60" cy="50" r="25" fill="var(--vigia-glass)" stroke="var(--vigia-body)" stroke-width="6"/>
+          <g clip-path="url(#vigiaHead)">
+            <g id="vEye">
+              <circle cx="60" cy="50" r="13" fill="var(--vigia-iris)"/>
+              <polygon id="vAperture" points="60,41 67.8,45.5 67.8,54.5 60,59 52.2,54.5 52.2,45.5" fill="none" stroke="#8B7CF6" stroke-width="1.6"/>
+              <circle id="vPupil" cx="60" cy="50" r="6" fill="#0A0D14"/>
+              <circle cx="63" cy="46.5" r="2" fill="#FFFFFF"/>
+            </g>
+            <rect class="lid" x="34" y="26" width="52" height="48" fill="var(--vigia-body)"/>
+          </g>
+        </g>
+      </svg>
+      <div>
+        <h1>Overseer</h1>
+        <p>Vigía observa a tus agentes. Mueve el puntero: todos te siguen con la mirada. Haz clic en cada mascota.</p>
+      </div>
+    </div>
+    <div class="controls">
+      <span class="conn">Prototipo · datos de ejemplo</span>
+      <button class="btn" id="autoplay" aria-pressed="true">Simulación en marcha</button>
+      <button class="btn" id="calm" aria-pressed="false">Modo calma</button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <!-- ================= CLAUDE CODE: CHISPA (destello radial inspirado en el símbolo de Claude) ================= -->
+    <section class="pod" data-agent="claude" aria-labelledby="claudeTitle">
+      <div class="pod-head">
+        <div class="pod-name"><h2 id="claudeTitle">Claude Code</h2><span>mascota: Chispa</span></div>
+        <span class="pill" id="claudePill" data-s="edit"><i></i><span>Editando</span></span>
+      </div>
+      <div class="floor">
+        <svg id="claude" viewBox="0 0 140 140" role="img" aria-label="Chispa, mascota de Claude Code: editando" data-state="edit">
+          <ellipse cx="70" cy="134" rx="30" ry="4.5" fill="var(--shadow)"/>
+          <g class="shake">
+            <g id="cBody">
+              <g id="cRays" stroke="var(--spark)" stroke-linecap="round"></g>
+              <g id="cFace">
+                <circle cx="70" cy="72" r="23" fill="var(--spark-face)"/>
+                <g>
+                  <clipPath id="cClipL"><ellipse cx="62" cy="69" rx="6.2" ry="7.4"/></clipPath>
+                  <ellipse cx="62" cy="69" rx="6.2" ry="7.4" fill="var(--spark-eye)"/>
+                  <g clip-path="url(#cClipL)">
+                    <g class="pupil"><circle cx="62" cy="69" r="3.4" fill="var(--spark-pupil)"/><circle cx="63.4" cy="67.2" r="1.1" fill="#FFF"/></g>
+                    <rect class="lid" x="55" y="61" width="14" height="16" fill="var(--spark-face)"/>
+                  </g>
+                </g>
+                <g>
+                  <clipPath id="cClipR"><ellipse cx="78" cy="69" rx="6.2" ry="7.4"/></clipPath>
+                  <ellipse cx="78" cy="69" rx="6.2" ry="7.4" fill="var(--spark-eye)"/>
+                  <g clip-path="url(#cClipR)">
+                    <g class="pupil"><circle cx="78" cy="69" r="3.4" fill="var(--spark-pupil)"/><circle cx="79.4" cy="67.2" r="1.1" fill="#FFF"/></g>
+                    <rect class="lid" x="71" y="61" width="14" height="16" fill="var(--spark-face)"/>
+                  </g>
+                </g>
+                <path id="cMouth" d="M65 81 Q70 85 75 81" fill="none" stroke="var(--spark-pupil)" stroke-width="2.2" stroke-linecap="round"/>
+              </g>
+            </g>
+          </g>
+          <g transform="translate(112 22)">
+            <g class="prop prop-read"><circle r="14" fill="var(--surface-2)" stroke="var(--line-strong)"/><path d="M-8 -5 h7 v11 h-7z M1 -5 h7 v11 h-7z" fill="none" stroke="var(--fg)" stroke-width="1.8" stroke-linejoin="round"/></g>
+            <g class="prop prop-edit"><circle r="14" fill="var(--surface-2)" stroke="var(--line-strong)"/><path d="M-6 7 l2-6 9-9 4 4 -9 9z" fill="none" stroke="var(--fg)" stroke-width="1.8" stroke-linejoin="round"/></g>
+            <g class="prop prop-run"><circle r="14" fill="var(--surface-2)" stroke="var(--line-strong)"/><path d="M-7 -4 l5 4 -5 4 M1 5 h7" fill="none" stroke="var(--fg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>
+            <g class="qbubble"><circle r="14" fill="var(--warn)"/><text y="6" text-anchor="middle" font-family="var(--font-display)" font-weight="800" font-size="17" fill="#141A26">?</text></g>
+          </g>
+          <g class="zz" font-family="var(--font-display)" font-weight="700" fill="var(--muted)"><text x="102" y="40" font-size="14">z</text><text x="110" y="28" font-size="11">z</text></g>
+          <g class="sparks" fill="var(--spark-hot)">
+            <path d="M18 30 l2 6 6 2 -6 2 -2 6 -2 -6 -6 -2 6 -2z"/><path d="M122 104 l1.5 4.5 4.5 1.5 -4.5 1.5 -1.5 4.5 -1.5 -4.5 -4.5 -1.5 4.5 -1.5z"/>
+          </g>
+        <svg id="v3-chispa" class="chispa px v3-creature" data-state="edit" aria-label="Chispa: editando" viewBox="0 0 24 24" role="img">
+  <g class="whole">
+    <!-- patas: dos pares que alternan al ejecutar -->
+    <g class="legs-a"><rect class="body" x="6" y="17" width="2" height="3"/><rect class="body" x="14" y="17" width="2" height="3"/></g>
+    <g class="legs-b"><rect class="body" x="9" y="17" width="2" height="3"/><rect class="body" x="17" y="17" width="2" height="3"/></g>
+    <g class="upper">
+      <!-- cuerpo en bloque -->
+      <rect class="body" x="5" y="7" width="15" height="10"/>
+      <rect class="shade" x="5" y="16" width="15" height="1"/>
+      <!-- brazos -->
+      <rect class="body arm-l" x="3" y="11" width="2" height="2"/>
+      <g class="arm-r"><rect class="body" x="20" y="11" width="2" height="2"/></g>
+      <!-- ojos -->
+      <g class="eyes">
+        <g class="eye-open"><rect class="eye" x="9" y="10" width="1" height="3"/><rect class="eye" x="15" y="10" width="1" height="3"/></g>
+        <g class="eye-happy"><rect class="eye" x="8" y="11" width="1" height="1"/><rect class="eye" x="9" y="10" width="1" height="1"/><rect class="eye" x="10" y="11" width="1" height="1"/><rect class="eye" x="14" y="11" width="1" height="1"/><rect class="eye" x="15" y="10" width="1" height="1"/><rect class="eye" x="16" y="11" width="1" height="1"/></g>
+        <g class="eye-x"><rect class="eye" x="8" y="10" width="1" height="1"/><rect class="eye" x="10" y="10" width="1" height="1"/><rect class="eye" x="9" y="11" width="1" height="1"/><rect class="eye" x="8" y="12" width="1" height="1"/><rect class="eye" x="10" y="12" width="1" height="1"/><rect class="eye" x="14" y="10" width="1" height="1"/><rect class="eye" x="16" y="10" width="1" height="1"/><rect class="eye" x="15" y="11" width="1" height="1"/><rect class="eye" x="14" y="12" width="1" height="1"/><rect class="eye" x="16" y="12" width="1" height="1"/></g>
+        <g class="eye-shut"><rect class="eye" x="8" y="12" width="3" height="1"/><rect class="eye" x="14" y="12" width="3" height="1"/></g>
+      </g>
+      <!-- accesorios -->
+      <g class="prop prop-book"><rect x="1" y="12" width="4" height="3" fill="#E8ECF4"/><rect x="3" y="12" width="1" height="3" fill="#98A2B8"/></g>
+      <g class="prop prop-pencil"><rect x="21" y="8" width="1" height="4" fill="#FBBF24"/><rect x="21" y="12" width="1" height="1" fill="#E8ECF4"/></g>
+    </g>
+    <!-- efectos -->
+    <g class="fx fx-think"><rect x="10" y="3" width="1" height="1" fill="#E8ECF4"/><rect x="12" y="3" width="1" height="1" fill="#E8ECF4"/><rect x="14" y="3" width="1" height="1" fill="#E8ECF4"/></g>
+    <g class="fx fx-run"><rect x="1" y="8" width="1" height="1" fill="#F0A07E"/><rect x="2" y="9" width="1" height="1" fill="#F0A07E"/><rect x="1" y="10" width="1" height="1" fill="#F0A07E"/></g>
+    <g class="fx fx-ask"><rect x="17" y="0" width="7" height="8" fill="#FBBF24"/><rect x="19" y="1" width="3" height="1" fill="#0A0D14"/><rect x="18" y="2" width="1" height="1" fill="#0A0D14"/><rect x="22" y="2" width="1" height="1" fill="#0A0D14"/><rect x="21" y="3" width="1" height="1" fill="#0A0D14"/><rect x="20" y="4" width="1" height="1" fill="#0A0D14"/><rect x="20" y="6" width="1" height="1" fill="#0A0D14"/></g>
+    <g class="fx fx-spark"><rect x="3" y="4" width="1" height="1" fill="#FBBF24"/><rect x="20" y="3" width="1" height="1" fill="#FBBF24"/><rect x="12" y="2" width="1" height="1" fill="#FBBF24"/></g>
+    <g class="fx fx-zz"><rect x="17" y="2" width="4" height="1" fill="#98A2B8"/><rect x="19" y="3" width="1" height="1" fill="#98A2B8"/><rect x="18" y="4" width="1" height="1" fill="#98A2B8"/><rect x="17" y="5" width="4" height="1" fill="#98A2B8"/><rect x="21" y="0" width="2" height="1" fill="#98A2B8"/><rect x="22" y="1" width="1" height="0.01" fill="none"/></g>
+  </g>
+</svg>
+        </svg>
+        <div class="now">
+          <span class="label">Ahora</span>
+          <span class="title" id="claudeNowTitle">Edit · events.service.ts</span>
+          <span class="detail" id="claudeNowDetail">frontend/src/app/events.service.ts — addEventListener('event')</span>
+          <div class="meta"><span>42 herramientas</span><span>2 sesiones</span><span id="claudeAgo">hace 3 s</span></div>
+        </div>
+      </div>
+      <div class="try">
+        <span>Probar estado</span>
+        <div class="states" data-for="claude" role="group" aria-label="Estados de Chispa"></div>
+      </div>
+      <div class="pod-actions"><button class="btn" id="handoff">Ceder el turno a Codex</button></div>
+    </section>
+
+    <!-- ================= CODEX: NODO (nudo hexagonal + prompt de terminal) ================= -->
+    <section class="pod" data-agent="codex" aria-labelledby="codexTitle">
+      <div class="pod-head">
+        <div class="pod-name"><h2 id="codexTitle">Codex</h2><span>mascota: Nodo</span></div>
+        <span class="pill" id="codexPill" data-s="thinking"><i></i><span>Pensando</span></span>
+      </div>
+      <div class="floor">
+        <svg id="codex" viewBox="0 0 140 140" role="img" aria-label="Nodo, mascota de Codex: pensando" data-state="thinking">
+          <ellipse cx="70" cy="134" rx="30" ry="4.5" fill="var(--shadow)"/>
+          <g class="float">
+            <g class="shake">
+              <g id="nKnot" class="knot" fill="none" stroke-width="5.5" stroke-linejoin="round"></g>
+              <g id="nFace">
+                <rect x="45" y="56" width="50" height="32" rx="8" fill="var(--screen)" stroke="var(--knot)" stroke-width="2.5"/>
+                <g id="nPixels" fill="var(--led)"></g>
+              </g>
+            </g>
+            <g class="orbit" fill="var(--knot-glow)">
+              <g><rect x="12" y="68" width="8" height="8" rx="2"/></g>
+              <g style="animation-delay:-1.2s"><rect x="122" y="68" width="6" height="6" rx="2"/></g>
+            </g>
+          </g>
+          <g transform="translate(114 20)">
+            <g class="qbubble"><circle r="14" fill="var(--warn)"/><text y="6" text-anchor="middle" font-family="var(--font-display)" font-weight="800" font-size="17" fill="#141A26">?</text></g>
+          </g>
+          <g class="zz" font-family="var(--font-mono)" font-weight="600" fill="var(--muted)"><text x="104" y="38" font-size="13">_z</text><text x="112" y="24" font-size="10">_z</text></g>
+          <g class="sparks" fill="var(--knot-glow)"><rect x="16" y="28" width="6" height="6"/><rect x="118" y="104" width="5" height="5"/><rect x="110" y="16" width="4" height="4"/></g>
+        <svg id="v3-nodo" class="nodo v3-creature" data-state="thinking" aria-label="Nodo: pensando" viewBox="0 0 120 120" role="img">
+  <defs>
+    <linearGradient id="prototype-nodo-gradient" x1="0" y1="14" x2="0" y2="106" gradientUnits="userSpaceOnUse">
+      <stop class="stop-top" offset="0"/><stop class="stop-mid" offset=".5"/><stop class="stop-bot" offset="1"/>
+    </linearGradient>
+  </defs>
+  <g class="cloud">
+    <!-- nube festoneada: unión de lóbulos con el mismo degradado -->
+    <g fill="url(#prototype-nodo-gradient)">
+      <circle cx="60" cy="60" r="34"/>
+      <circle cx="47" cy="30" r="17"/><circle cx="76" cy="30" r="16"/>
+      <circle cx="92" cy="52" r="16"/><circle cx="88" cy="81" r="17"/>
+      <circle cx="62" cy="94" r="16"/><circle cx="34" cy="86" r="17"/>
+      <circle cx="26" cy="58" r="16"/>
+    </g>
+  </g>
+  <g class="face">
+    <g class="f-idle"><polyline class="glyph chev" points="38,46 50,60 38,74"/><line class="glyph cursor" x1="60" y1="74" x2="80" y2="74"/></g>
+    <g class="f-think"><circle class="glyph-fill" cx="44" cy="62" r="5"/><circle class="glyph-fill" cx="60" cy="62" r="5"/><circle class="glyph-fill" cx="76" cy="62" r="5"/></g>
+    <g class="f-run"><polyline class="glyph" points="34,46 46,60 34,74"/><polyline class="glyph c2" points="50,46 62,60 50,74"/><line class="glyph cursor" x1="68" y1="74" x2="84" y2="74"/></g>
+    <g class="f-ask"><path class="glyph" d="M50 48 q10 -10 20 0 q4 10 -10 14 v6"/><circle class="glyph-fill" cx="60" cy="80" r="4.5"/></g>
+    <g class="f-done"><polyline class="glyph" points="42,62 54,74 78,48"/></g>
+    <g class="f-err"><line class="glyph" x1="44" y1="48" x2="72" y2="76"/><line class="glyph" x1="72" y1="48" x2="44" y2="76"/></g>
+    <g class="f-sleep"><line class="glyph" x1="38" y1="62" x2="52" y2="62"/><line class="glyph" x1="66" y1="62" x2="80" y2="62"/></g>
+  </g>
+  <g class="zz"><text x="92" y="22" fill="#98A2B8" font-family="ui-monospace,monospace" font-size="16">z</text></g>
+</svg>
+        </svg>
+        <div class="now">
+          <span class="label">Ahora</span>
+          <span class="title" id="codexNowTitle">Razonando</span>
+          <span class="detail" id="codexNowDetail">Planificando el lector de rollouts: custom_tool_call y task_complete</span>
+          <div class="meta"><span>17 herramientas</span><span>1 sesión + 1 subagente</span><span id="codexAgo">ahora</span></div>
+        </div>
+      </div>
+      <div class="try">
+        <span>Probar estado</span>
+        <div class="states" data-for="codex" role="group" aria-label="Estados de Nodo"></div>
+      </div>
+      <p class="note">Chispa mira de forma continua y mueve sus rayos; Nodo mira a saltos de píxel y gira su nudo. Cada agente tiene su propio carácter.</p>
+    </section>
+  </main>
+
+  <section class="timeline" aria-labelledby="tlTitle">
+    <header><h2 id="tlTitle">Línea de tiempo</h2><span>Eventos de ejemplo para el prototipo</span></header>
+    <ol class="feed" id="feed"></ol>
+  </section>
+
+  <p class="sr-only" aria-live="polite" id="announce"></p>
+</div>
+
+<svg class="envelope" id="envelope" viewBox="0 0 34 26" hidden aria-hidden="true">
+  <rect x="1" y="1" width="32" height="24" rx="4" fill="var(--surface)" stroke="var(--brand)" stroke-width="2"/>
+  <path d="M3 4 L17 15 L31 4" fill="none" stroke="var(--brand)" stroke-width="2" stroke-linejoin="round"/>
+</svg>
+
+<script>
+(() => {
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  const STATES = [
+    ['idle', 'En espera'], ['thinking', 'Pensando'], ['read', 'Leyendo'], ['edit', 'Editando'], ['run', 'Ejecutando'],
+    ['permission', 'Pide permiso'], ['done', 'Terminó'], ['error', 'Error'], ['sleeping', 'Durmiendo'],
+  ];
+  const LABEL = Object.fromEntries(STATES);
+  const ACTIVE = new Set(['thinking', 'read', 'edit', 'run', 'permission']);
+  const MASCOT = { claude: 'Chispa, mascota de Claude Code', codex: 'Nodo, mascota de Codex' };
+  const $ = (id) => document.getElementById(id);
+  $('v3-chispa').addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (calm) return;
+    const jump = $('v3-chispa').querySelector('.whole').animate(
+      [{ transform: 'translateY(0%)' }, { transform: 'translateY(-15%)' }, { transform: 'translateY(0%)' }],
+      { duration: 400, easing: 'steps(4)' },
+    );
+    jump.onfinish = () => jump.cancel();
+  });
+  $('v3-nodo').addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (calm) return;
+    const sprite = $('v3-nodo'), gradient = sprite.querySelector('linearGradient');
+    const pulse = sprite.querySelector('.gaze').animate(
+      [{ transform: 'scale(1)' }, { transform: 'scale(1.1)' }, { transform: 'scale(1)' }],
+      { duration: 400, easing: 'ease-out' },
+    );
+    pulse.onfinish = () => pulse.cancel();
+    gradient.setAttribute('y1', '106'); gradient.setAttribute('y2', '14');
+    sprite.classList.add('glitch');
+    setTimeout(() => sprite.classList.remove('glitch'), 120);
+    setTimeout(() => { gradient.setAttribute('y1', '14'); gradient.setAttribute('y2', '106'); }, 400);
+  });
+  let calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const pointer = { x: innerWidth / 2, y: innerHeight / 3, t: 0 };
+  const state = { claude: 'edit', codex: 'thinking' };
+  const gazeOverride = {};
+
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, k) => a + (b - a) * k;
+  const el = (name, attrs) => { const e = document.createElementNS(SVGNS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+  function toClient(svg, vx, vy) {
+    const r = svg.getBoundingClientRect();
+    const s = r.width / svg.viewBox.baseVal.width;
+    return { x: r.left + vx * s, y: r.top + vy * s, s };
+  }
+  function target(agent) {
+    if (gazeOverride[agent]) return gazeOverride[agent];
+    if (performance.now() - pointer.t > 4500 && agent !== 'vigia') {
+      const o = $(agent === 'claude' ? 'codex' : 'claude').getBoundingClientRect();
+      return { x: o.left + o.width / 2, y: o.top + o.height / 2 };
+    }
+    return pointer;
+  }
+  function gaze(svg, cx, cy, t, max) {
+    const c = toClient(svg, cx, cy);
+    const dx = t.x - c.x, dy = t.y - c.y, d = Math.hypot(dx, dy) || 1;
+    const m = Math.min(max, d / (30 * c.s));
+    return { x: (dx / d) * m, y: (dy / d) * m, dx, dy };
+  }
+
+  // ================= Vigía =================
+  const vigia = $('vigia'), vEye = $('vEye'), vBeam = $('vBeam'), vPupil = $('vPupil'), vAperture = $('vAperture');
+  const vs = { x: 0, y: 0, beam: -20, focus: 0 };
+  function drawVigia() {
+    const g = gaze(vigia, 60, 50, pointer, 5);
+    vs.x = lerp(vs.x, g.x, .18); vs.y = lerp(vs.y, g.y, .18);
+    vEye.setAttribute('transform', `translate(${vs.x.toFixed(2)} ${vs.y.toFixed(2)})`);
+    const idle = performance.now() - pointer.t > 4500;
+    const ang = idle ? Math.sin(performance.now() / 1800) * 35 + 10 : Math.atan2(g.dy, g.dx) * 180 / Math.PI;
+    vs.beam = lerp(vs.beam, ang, .08);
+    vBeam.setAttribute('transform', `rotate(${vs.beam.toFixed(1)} 60 50)`);
+    vs.focus = lerp(vs.focus, vigia.matches(':hover') ? 1 : 0, .15);
+    vPupil.setAttribute('r', (6 - vs.focus * 2.6).toFixed(2));
+    vAperture.setAttribute('transform', `rotate(${(vs.focus * 30).toFixed(1)} 60 50)`);
+  }
+  function syncVigia() {
+    vBeam.setAttribute('opacity', ACTIVE.has(state.claude) || ACTIVE.has(state.codex) ? '.9' : '0');
+    $('vBulb').setAttribute('fill', state.claude === 'permission' || state.codex === 'permission' ? 'var(--warn)' : '#C9C2FF');
+    const led = (s) => s === 'error' ? 'var(--bad)' : s === 'permission' ? 'var(--warn)' : ACTIVE.has(s) || s === 'done' ? 'var(--ok)' : '#3A4256';
+    $('vLedClaude').setAttribute('fill', led(state.claude));
+    $('vLedCodex').setAttribute('fill', led(state.codex));
+  }
+  vigia.addEventListener('click', () => {
+    if (!calm) vigia.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.08)' }, { transform: 'scale(1)' }], { duration: 300, easing: 'ease-out' });
+    blink(vigia);
+  });
+
+  // ================= Chispa (Claude Code) =================
+  // Destello radial de 12 rayos irregulares alrededor de una cara redonda.
+  const claude = $('claude'), cRays = $('cRays'), cBody = $('cBody'), cMouth = $('cMouth');
+  const cPupils = claude.querySelectorAll('.pupil');
+  const RAY_LEN = [27, 23, 29, 24, 28, 22, 26, 23, 28, 24, 29, 25];
+  const RAY_W = [11, 9.5, 11.5, 10, 11, 9, 11, 9.5, 11, 9.5, 11.5, 10];
+  const rays = RAY_LEN.map((len, i) => {
+    const line = el('line', { x1: 70, y1: 72 - 16, x2: 70, y2: 72 - 16 - len, 'stroke-width': RAY_W[i] });
+    const g = el('g', { transform: `rotate(${i * 30 + (i % 2 ? 4 : -3)} 70 72)` });
+    g.appendChild(line); cRays.appendChild(g);
+    return { line, len, phase: i * 0.9 };
+  });
+  // energía, velocidad de pulso y velocidad de giro por estado
+  const SPARK = {
+    idle: [1, .04, 0], thinking: [1, .08, .35], read: [1.02, .1, .15], edit: [1.04, .12, .2], run: [1.05, .16, .3],
+    permission: [1, .08, 0], done: [1.12, .1, 1.4], error: [.72, .02, 0], sleeping: [.5, .01, 0],
+  };
+  const MOUTH = { smile: 'M65 81 Q70 85 75 81', o: 'M68 82 a2.2 2.6 0 1 0 4.4 0 a2.2 2.6 0 1 0 -4.4 0', flat: 'M65 82 L75 82', sad: 'M65 84 Q70 79 75 84', focus: 'M66 82 Q70 83.5 74 82' };
+  const mouthFor = (s) => ({ idle: 'smile', thinking: 'focus', read: 'focus', edit: 'focus', run: 'focus', permission: 'o', done: 'smile', error: 'sad', sleeping: 'flat' }[s] || 'smile');
+  const cs = { x: 0, y: 0, tilt: 0, spin: 0, energy: 1, kick: 0 };
+  function drawClaude(now) {
+    const s = state.claude, cfg = SPARK[s];
+    const g = s === 'sleeping' ? { x: 0, y: 0, dx: 0 } : gaze(claude, 70, 69, target('claude'), 3.2);
+    cs.x = lerp(cs.x, g.x, .2); cs.y = lerp(cs.y, g.y, .2);
+    cPupils.forEach((p) => p.setAttribute('transform', `translate(${cs.x.toFixed(2)} ${cs.y.toFixed(2)})`));
+    cs.energy = lerp(cs.energy, cfg[0], .08);
+    cs.kick = lerp(cs.kick, 0, .06);
+    cs.spin += cfg[2] + cs.kick * 6;
+    const r = claude.getBoundingClientRect();
+    cs.tilt = lerp(cs.tilt, s === 'sleeping' ? 0 : clamp(g.dx / (r.width || 1) * 8, -12, 12), .08);
+    cRays.setAttribute('transform', `rotate(${(cs.spin + cs.tilt).toFixed(2)} 70 72)`);
+    rays.forEach((ray, i) => {
+      let k = cs.energy + Math.sin(now / 1000 * (cfg[1] * 30) + ray.phase) * (cfg[1] * .9);
+      if (s === 'permission' && i === 0) k += .35 + Math.sin(now / 140) * .08; // un rayo se alza como una mano
+      if (s === 'error') k += Math.sin(now / 50 + i) * .04;
+      ray.line.setAttribute('y2', (72 - 16 - ray.len * k).toFixed(2));
+    });
+    cBody.setAttribute('transform', `rotate(${(cs.tilt * .35).toFixed(2)} 70 72)`);
+  }
+  claude.addEventListener('click', () => {
+    if (!calm) {
+      cs.kick = 1; // ráfaga de giro
+      cBody.parentNode.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.12)' }, { transform: 'scale(.95)' }, { transform: 'scale(1)' }],
+        { duration: 500, easing: 'cubic-bezier(.3,1.5,.5,1)', transformOrigin: '70px 72px' });
+    }
+    cMouth.setAttribute('d', MOUTH.o);
+    setTimeout(() => cMouth.setAttribute('d', MOUTH[mouthFor(state.claude)]), 600);
+  });
+
+  // ================= Nodo (Codex) =================
+  // Nudo de seis anillos redondeados entrelazados con una pantalla de terminal en el centro.
+  const codex = $('codex'), nKnot = $('nKnot'), nPixels = $('nPixels'), nFace = $('nFace');
+  const loops = [0, 60, 120, 180, 240, 300].map((a) => {
+    const p = el('rect', { x: 62, y: 26, width: 26, height: 44, rx: 13, stroke: 'var(--knot)' });
+    const g = el('g', { transform: `rotate(${a} 70 72)` });
+    g.appendChild(p); nKnot.appendChild(g);
+    return p;
+  });
+  const ns = { rot: 0, spin: 0, kick: 0, gx: 0, gy: 0, fx: 0, fy: 0, frame: 0, cursorOn: true, lastKey: '' };
+  const COLS = 12, ROWS = 7, CELL = 4, OX = 46, OY = 58;
+  const GLYPH = {
+    q: ['....####....', '...#....#...', '........#...', '......##....', '.....#......', '............', '.....#......'],
+    ok: ['............', '..........#.', '.........#..', '..#.....#...', '...#...#....', '....#.#.....', '.....#......'],
+    x: ['............', '.#...#.#...#', '..#.#...#.#.', '...#.....#..', '..#.#...#.#.', '.#...#.#...#', '............'],
+  };
+  const put = (set, c, r) => { if (c >= 0 && c < COLS && r >= 0 && r < ROWS) set.add(c + ',' + r); };
+  const glyph = (rows) => { const set = new Set(); rows.forEach((row, r) => [...row].forEach((ch, c) => { if (ch === '#') set.add(c + ',' + r); })); return set; };
+  function framePixels() {
+    const s = state.codex, set = new Set();
+    if (s === 'permission') return glyph(GLYPH.q);
+    if (s === 'done') return glyph(GLYPH.ok);
+    if (s === 'error') return glyph(GLYPH.x);
+    if (s === 'run' || s === 'edit' || s === 'read') {
+      const lens = s === 'read' ? [9, 6, 10, 4, 8, 7, 5, 9] : [6, 10, 3, 8, 11, 5, 7, 9];
+      for (let r = 0; r < ROWS; r += 2) {
+        const len = lens[(r / 2 + ns.frame) % lens.length], indent = (r / 2 + ns.frame) % 3 === 1 ? 2 : 1;
+        for (let c = indent; c < Math.min(COLS - 1, indent + len); c++) put(set, c, r);
+      }
+      if (s === 'run' && ns.cursorOn) put(set, 10, 6);
+      return set;
+    }
+    const gx = ns.gx, gy = ns.gy;
+    if (s === 'sleeping') { [3, 4, 7, 8].forEach((c) => put(set, c, 2)); }
+    else {
+      const rows = codex.classList.contains('blink') ? [2] : [1, 2];
+      const up = s === 'thinking' ? -1 : 0;
+      [[3, 4], [7, 8]].forEach(([a, b]) => rows.forEach((r) => { put(set, a + gx, r + gy + up); put(set, b + gx, r + gy + up); }));
+    }
+    // boca: el prompt ">_" (en pensando, puntos suspensivos)
+    if (s === 'thinking') { for (let i = 0; i < ns.frame % 4; i++) put(set, 5 + i, 5); return set; }
+    put(set, 3, 4); put(set, 4, 5); put(set, 3, 6);
+    if (ns.cursorOn || s === 'sleeping') { put(set, 6, 6); put(set, 7, 6); put(set, 8, 6); }
+    return set;
+  }
+  function renderPixels() {
+    const set = framePixels(), key = [...set].sort().join('|');
+    if (key === ns.lastKey) return;
+    ns.lastKey = key;
+    nPixels.replaceChildren(...[...set].map((k) => {
+      const [c, r] = k.split(',').map(Number);
+      return el('rect', { x: OX + c * CELL + .5, y: OY + r * CELL + .5, width: CELL - 1, height: CELL - 1, rx: .6 });
+    }));
+    nPixels.setAttribute('opacity', state.codex === 'sleeping' ? '.45' : '1');
+  }
+  const KNOT_SPIN = { idle: 0, thinking: .5, read: .2, edit: .25, run: .35, permission: 0, done: 1.2, error: 0, sleeping: 0 };
+  function drawCodex() {
+    const s = state.codex;
+    const g = s === 'sleeping' ? { x: 0, y: 0, dx: 0, dy: 0 } : gaze(codex, 70, 72, target('codex'), 1);
+    ns.gx = Math.round(clamp(g.x * 1.4, -1, 1));
+    ns.gy = Math.round(clamp(g.y * 1.2, 0, 1)) * (g.y < -.4 ? 0 : 1) - (g.y < -.4 ? 1 : 0);
+    const r = codex.getBoundingClientRect();
+    ns.kick = lerp(ns.kick, 0, .07);
+    ns.spin += KNOT_SPIN[s] + ns.kick * 7;
+    ns.rot = lerp(ns.rot, s === 'sleeping' ? 0 : clamp(g.dx / (r.width || 1) * 14, -20, 20), .08);
+    nKnot.setAttribute('transform', `rotate(${(ns.spin + ns.rot).toFixed(2)} 70 72)`);
+    ns.fx = lerp(ns.fx, clamp(g.dx / (r.width || 1), -1, 1) * 3, .1);
+    ns.fy = lerp(ns.fy, clamp(g.dy / (r.height || 1), -1, 1) * 2.5, .1);
+    nFace.setAttribute('transform', `translate(${ns.fx.toFixed(2)} ${ns.fy.toFixed(2)})`);
+    renderPixels();
+  }
+  function syncKnot() {
+    const s = state.codex;
+    const color = s === 'error' ? 'var(--bad)' : s === 'permission' ? 'var(--warn)' : s === 'sleeping' ? 'var(--knot-dim)' : ['read', 'edit', 'run', 'done'].includes(s) ? 'var(--knot-glow)' : 'var(--knot)';
+    loops.forEach((p) => p.setAttribute('stroke', color));
+  }
+  codex.addEventListener('click', () => {
+    if (!calm) { ns.kick = 1; codex.classList.remove('glitch'); void codex.getBoundingClientRect(); codex.classList.add('glitch'); }
+  });
+  // Chispa y Nodo usan las poses SVG declarativas de la revisión 3.
+
+  // ================= parpadeo =================
+  function blink(svg) { svg.classList.add('blink'); setTimeout(() => svg.classList.remove('blink'), 140); }
+  function scheduleBlink(svg) {
+    setTimeout(() => { if (!calm && state[svg.id] !== 'sleeping') blink(svg); scheduleBlink(svg); }, 2200 + Math.random() * 3800);
+  }
+  [vigia].forEach(scheduleBlink);
+
+  // ================= estado =================
+  const NOW = {
+    claude: {
+      idle: ['En espera', 'Turno terminado. Esperando tu próximo prompt.'],
+      thinking: ['Pensando', 'Revisando cómo emite eventos SseBroadcaster'],
+      read: ['Read · SseBroadcaster.java', 'backend/src/main/java/com/agentops/service/SseBroadcaster.java'],
+      edit: ['Edit · events.service.ts', "frontend/src/app/events.service.ts — addEventListener('event')"],
+      run: ['Bash · mvn -q test', 'backend · 18 pruebas'],
+      permission: ['Pide permiso', 'Bash: git init — esperando tu aprobación en la terminal'],
+      done: ['Turno terminado', 'Fase 1 aplicada: 5 archivos, +212 / −48'],
+      error: ['Error', 'PostToolUseFailure · npm run build salió con código 1'],
+      sleeping: ['Sin sesión', 'Claude Code no está abierto'],
+    },
+    codex: {
+      idle: ['En espera', 'Sesión abierta, sin turno activo'],
+      thinking: ['Razonando', 'Planificando el lector de rollouts: custom_tool_call y task_complete'],
+      read: ['exec · rg custom_tool_call', 'integrations/codex-tail.mjs'],
+      edit: ['apply_patch', 'Update File: backend/.../CodexSessionWatcher.java'],
+      run: ['exec · mvn -q test', 'task en curso · 34 s'],
+      permission: ['Pide permiso', 'Escalada de sandbox para escribir en ~/.codex'],
+      done: ['task_complete', 'Watcher listo · 6 pruebas nuevas en verde'],
+      error: ['Error', 'exec salió con código 2'],
+      sleeping: ['Sin sesión', 'Codex Desktop no tiene hilos activos'],
+    },
+  };
+  const mascotLabel = Object.fromEntries(STATES.map(([key, label]) => [key, label.toLowerCase()]));
+  function setState(agent, s, announce = true) {
+    if (state[agent] === s) return;
+    state[agent] = s;
+    const svg = $(agent);
+    svg.dataset.state = s;
+    const sprite = $('v3-' + agent);
+    sprite.dataset.state = ({ read: 'reading', edit: 'editing', run: 'running' }[s] || s);
+    sprite.setAttribute('aria-label', `${agent === 'claude' ? 'Chispa' : 'Nodo'}: ${mascotLabel[s]}`);
+    svg.setAttribute('aria-label', `${MASCOT[agent]}: ${LABEL[s].toLowerCase()}`);
+    const pill = $(agent + 'Pill');
+    pill.dataset.s = s; pill.lastElementChild.textContent = LABEL[s];
+    $(agent + 'NowTitle').textContent = NOW[agent][s][0];
+    $(agent + 'NowDetail').textContent = NOW[agent][s][1];
+    $(agent + 'Ago').textContent = 'ahora';
+    if (agent === 'claude') cMouth.setAttribute('d', MOUTH[mouthFor(s)]);
+    if (agent === 'codex') { ns.lastKey = ''; syncKnot(); }
+    document.querySelectorAll(`.states[data-for="${agent}"] .chip`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.s === s)));
+    if (announce && ['permission', 'done', 'error'].includes(s)) $('announce').textContent = `${agent === 'claude' ? 'Claude Code' : 'Codex'}: ${LABEL[s]}`;
+    syncVigia();
+  }
+  document.querySelectorAll('.states').forEach((box) => {
+    const agent = box.dataset.for;
+    STATES.forEach(([s, label]) => {
+      const b = document.createElement('button');
+      b.className = 'chip'; b.dataset.s = s; b.textContent = label;
+      b.setAttribute('aria-pressed', String(state[agent] === s));
+      b.addEventListener('click', () => { stopAuto(); setState(agent, s); });
+      box.appendChild(b);
+    });
+  });
+
+  // ================= línea de tiempo =================
+  const feed = $('feed');
+  function addEvent(agent, kind, text, code, isNew = true) {
+    const li = document.createElement('li');
+    if (isNew && !calm) li.className = 'new';
+    li.innerHTML = `<time>${new Date().toLocaleTimeString('es-PE', { hour12: false })}</time><span class="who" data-a="${agent}">${agent === 'claude' ? 'Claude' : 'Codex'} · ${kind}</span><span class="what"></span>`;
+    const what = li.querySelector('.what');
+    what.textContent = text + (code ? ' ' : '');
+    if (code) { const c = document.createElement('code'); c.textContent = code; what.appendChild(c); }
+    feed.prepend(li);
+    while (feed.children.length > 9) feed.lastElementChild.remove();
+  }
+  [
+    ['codex', 'inicio', 'Sesión iniciada', 'Codex Desktop 0.159.2'],
+    ['claude', 'prompt', 'Corrige el SSE de la web', ''],
+    ['claude', 'tool', 'Read', 'backend/.../SseBroadcaster.java'],
+    ['codex', 'tool', 'exec', 'rg custom_tool_call integrations/'],
+    ['claude', 'tool', 'Edit', 'frontend/src/app/events.service.ts'],
+    ['codex', 'pensando', 'Planificando el lector de rollouts', ''],
+  ].forEach((e) => addEvent(...e, false));
+
+  // ================= traspaso Claude → Codex =================
+  function handoff() {
+    const env = $('envelope');
+    const a = claude.getBoundingClientRect(), b = codex.getBoundingClientRect();
+    const from = { x: a.left + a.width * .5, y: a.top + a.height * .35 }, to = { x: b.left + b.width * .5, y: b.top + b.height * .35 };
+    gazeOverride.claude = to;
+    setState('claude', 'idle');
+    addEvent('claude', 'handoff', 'Cedió el turno a Codex', 'revisión de la fase 1');
+    const done = () => {
+      env.hidden = true; delete gazeOverride.claude; delete gazeOverride.codex;
+      if (!calm) { ns.kick = .6; codex.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.1)' }, { transform: 'scale(1)' }], { duration: 380, easing: 'ease-out' }); }
+      setState('codex', 'thinking');
+      addEvent('codex', 'prompt', 'Recibe el traspaso', 'auditar el diff de Claude');
+    };
+    if (calm) return done();
+    env.hidden = false;
+    const mid = { x: (from.x + to.x) / 2, y: Math.min(from.y, to.y) - 90 };
+    const pos = (p, r) => ({ transform: `translate(${p.x - 17}px, ${p.y - 13}px) rotate(${r}deg)` });
+    const anim = env.animate([pos(from, -10), pos(mid, 8), pos(to, 0)], { duration: 1100, easing: 'cubic-bezier(.45,0,.3,1)' });
+    const track = setInterval(() => { const r = env.getBoundingClientRect(); gazeOverride.codex = { x: r.left + 17, y: r.top + 13 }; }, 40);
+    anim.onfinish = () => { clearInterval(track); done(); };
+  }
+  $('handoff').addEventListener('click', () => { stopAuto(); handoff(); });
+
+  // ================= simulación =================
+  const SCRIPT = [
+    ['codex', 'read', 'tool', 'exec', 'rg custom_tool_call'],
+    ['claude', 'run', 'tool', 'Bash', 'mvn -q test'],
+    ['codex', 'edit', 'tool', 'apply_patch', 'CodexSessionWatcher.java'],
+    ['claude', 'permission', 'permiso', 'Bash pide aprobación', 'git init'],
+    ['codex', 'run', 'tool', 'exec', 'mvn -q test'],
+    ['claude', 'edit', 'tool', 'Edit', 'events.service.ts'],
+    ['codex', 'done', 'fin', 'task_complete', '6 pruebas en verde'],
+    ['claude', 'thinking', 'pensando', 'Revisando la reconexión del SSE', ''],
+    ['codex', 'idle', 'espera', 'Turno terminado', ''],
+    ['claude', 'done', 'fin', 'Turno terminado', '+212 / −48'],
+    ['handoff'],
+    ['claude', 'sleeping', 'fin', 'Sesión cerrada', ''],
+    ['codex', 'read', 'tool', 'exec', 'git diff --stat'],
+    ['codex', 'permission', 'permiso', 'Escalada de sandbox', '~/.codex'],
+    ['claude', 'error', 'error', 'npm run build falló', 'código 1'],
+    ['claude', 'thinking', 'prompt', 'Arregla el build', ''],
+  ];
+  let step = 0, autoTimer = null;
+  function tick() {
+    const e = SCRIPT[step++ % SCRIPT.length];
+    if (e[0] === 'handoff') handoff(); else { setState(e[0], e[1], false); addEvent(e[0], e[2], e[3], e[4]); }
+    autoTimer = setTimeout(tick, 2300);
+  }
+  function stopAuto() { clearTimeout(autoTimer); autoTimer = null; $('autoplay').setAttribute('aria-pressed', 'false'); $('autoplay').textContent = 'Reanudar simulación'; }
+  function startAuto() { if (autoTimer) return; $('autoplay').setAttribute('aria-pressed', 'true'); $('autoplay').textContent = 'Simulación en marcha'; autoTimer = setTimeout(tick, 1600); }
+  $('autoplay').addEventListener('click', () => (autoTimer ? stopAuto() : startAuto()));
+
+  // ================= modo calma =================
+  function applyCalm() { $('app').classList.toggle('calm', calm); $('calm').setAttribute('aria-pressed', String(calm)); }
+  $('calm').addEventListener('click', () => { calm = !calm; applyCalm(); });
+  applyCalm();
+  if (!calm) startAuto(); else stopAuto();
+
+  // ================= bucle =================
+  const mark = (e) => { pointer.x = e.clientX; pointer.y = e.clientY; pointer.t = performance.now(); };
+  addEventListener('pointermove', mark, { passive: true });
+  addEventListener('pointerdown', mark, { passive: true });
+  function frame(now) {
+    if (!document.hidden && !calm) {
+      drawVigia();
+      const cr = $('v3-chispa').getBoundingClientRect();
+      const cx = Math.sign(Math.round((pointer.x - (cr.left + cr.width / 2)) / 80));
+      const cy = Math.sign(Math.round((pointer.y - (cr.top + cr.height / 2)) / 120));
+      $('v3-chispa').querySelector('.eyes').setAttribute('transform', `translate(${state.claude === 'read' ? 0 : cx} ${state.claude === 'read' ? 0 : cy})`);
+      const nr = $('v3-nodo').getBoundingClientRect();
+      const nx = clamp((pointer.x - (nr.left + nr.width / 2)) / 300, -1, 1);
+      const ny = clamp((pointer.y - (nr.top + nr.height / 2)) / 300, -1, 1);
+      $('v3-nodo').querySelector('.face').setAttribute('transform', `translate(${(nx * 6).toFixed(2)} ${(ny * 5).toFixed(2)})`);
+      $('v3-nodo').querySelector('.gaze').setAttribute('transform', `rotate(${(nx * 8).toFixed(2)} 60 60)`);
+    }
+    requestAnimationFrame(frame);
+  }
+  drawVigia(); syncVigia(); syncKnot();
+  requestAnimationFrame(frame);
+})();
+</script>

@@ -1,0 +1,119 @@
+/* Chispa: pixel art terracota */
+:root {
+  --vigia-body: #8B7CF6;
+  --vigia-glass: #1B1838;
+  --vigia-iris: #C9C2FF;
+  --mascot-shadow: rgba(0, 0, 0, .3);
+  --mascot-glass: rgba(255, 255, 255, .16);
+  --mascot-white: #FFF;
+}
+ao-vigia > svg, ao-chispa > svg, ao-nodo > svg { display: block; width: 100%; height: 100%; }
+.chispa.px { shape-rendering: crispEdges; overflow: visible; }
+.chispa .body { fill: #D97757; }
+.chispa .shade { fill: #B85F42; }
+.chispa .eye { fill: #1A1210; }
+.chispa .whole { transform-box: fill-box; transform-origin: 50% 100%; }
+.chispa .eyes, .chispa .arm-r, .chispa .legs-a, .chispa .legs-b, .chispa .upper, .chispa .fx-zz { transform-box: fill-box; transform-origin: center; }
+.chispa .eyes { transition: transform .12s steps(1); }
+.chispa .prop, .chispa .fx { display: none; }
+.chispa .eye-happy, .chispa .eye-x, .chispa .eye-shut { display: none; }
+.chispa[data-state='idle'] .whole { animation: chispa-bob 2.4s steps(2) infinite; }
+.chispa[data-state='thinking'] .eyes { transform: translateY(-1px); }
+.chispa[data-state='thinking'] .fx-think { display: inline; }
+.chispa[data-state='thinking'] .fx-think rect { animation: mascot-dot 1.2s steps(1) infinite; }
+.chispa[data-state='thinking'] .fx-think rect:nth-child(2) { animation-delay: .2s; }
+.chispa[data-state='thinking'] .fx-think rect:nth-child(3) { animation-delay: .4s; }
+.chispa[data-state='reading'] .prop-book { display: inline; }
+.chispa[data-state='reading'] .eyes { animation: chispa-scan 1.6s steps(1) infinite; }
+.chispa[data-state='editing'] .prop-pencil { display: inline; }
+.chispa[data-state='editing'] .arm-r { animation: chispa-scribble .5s steps(2) infinite; }
+.chispa[data-state='running'] .legs-a { animation: chispa-walk-a .4s steps(1) infinite; }
+.chispa[data-state='running'] .legs-b { animation: chispa-walk-b .4s steps(1) infinite; }
+.chispa[data-state='running'] .fx-run { display: inline; animation: mascot-blink .4s steps(1) infinite; }
+.chispa[data-state='permission'] .arm-r { transform: translateY(-5px); animation: chispa-wave .6s steps(2) infinite; }
+.chispa[data-state='permission'] .fx-ask { display: inline; }
+.chispa[data-state='done'] .whole { animation: chispa-hop .8s steps(4) infinite; }
+.chispa[data-state='done'] .eye-open { display: none; }
+.chispa[data-state='done'] .eye-happy { display: inline; }
+.chispa[data-state='done'] .fx-spark { display: inline; animation: mascot-blink .5s steps(1) infinite; }
+.chispa[data-state='error'] .whole { animation: chispa-shake .25s steps(2) infinite; }
+.chispa[data-state='error'] .body { fill: #C2665A; }
+.chispa[data-state='error'] .eye-open { display: none; }
+.chispa[data-state='error'] .eye-x { display: inline; }
+.chispa[data-state='sleeping'] .eye-open { display: none; }
+.chispa[data-state='sleeping'] .eye-shut { display: inline; }
+.chispa[data-state='sleeping'] .legs-a, .chispa[data-state='sleeping'] .legs-b { display: none; }
+.chispa[data-state='sleeping'] .upper { transform: translateY(4px); }
+.chispa[data-state='sleeping'] .fx-zz { display: inline; animation: mascot-float 2.4s steps(4) infinite; }
+
+/* Nodo: nube festoneada con >_ */
+.nodo .gaze, .nodo .cloud, .nodo .chev, .nodo .cursor, .nodo .zz { transform-box: fill-box; transform-origin: center; }
+.nodo .glyph { fill: none; stroke: #fff; stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; }
+.nodo .glyph-fill { fill: #fff; }
+.nodo .face > g { display: none; }
+.nodo .face .f-idle { display: inline; }
+.nodo .cursor { animation: nodo-cursor 1.1s steps(1) infinite; }
+.nodo .stop-top { stop-color: #B2A6FF; }
+.nodo .stop-mid { stop-color: #7896FF; }
+.nodo .stop-bot { stop-color: #3346FF; }
+.nodo[data-state='idle'] .cloud { animation: nodo-breathe 3.2s ease-in-out infinite; }
+.nodo[data-state='thinking'] .cloud { animation: nodo-sway 3s ease-in-out infinite; }
+.nodo[data-state='thinking'] .face .f-idle { display: none; }
+.nodo[data-state='thinking'] .face .f-think { display: inline; }
+.nodo[data-state='thinking'] .f-think circle { animation: mascot-dot 1.2s steps(1) infinite; }
+.nodo[data-state='thinking'] .f-think circle:nth-child(2) { animation-delay: .2s; }
+.nodo[data-state='thinking'] .f-think circle:nth-child(3) { animation-delay: .4s; }
+.nodo[data-state='reading'] .chev { animation: nodo-look 1.6s ease-in-out infinite; }
+.nodo[data-state='editing'] .cursor { animation: nodo-type .45s steps(3) infinite; transform-origin: 0 50%; }
+.nodo[data-state='running'] .face .f-idle { display: none; }
+.nodo[data-state='running'] .face .f-run { display: inline; }
+.nodo[data-state='running'] .cloud { animation: nodo-sway .9s ease-in-out infinite; }
+.nodo[data-state='running'] .f-run .c2 { animation: mascot-blink .4s steps(1) infinite; }
+.nodo[data-state='permission'] .face .f-idle { display: none; }
+.nodo[data-state='permission'] .face .f-ask { display: inline; }
+.nodo[data-state='permission'] .stop-top { stop-color: #FFD27A; }
+.nodo[data-state='permission'] .stop-mid { stop-color: #F6A93B; }
+.nodo[data-state='permission'] .stop-bot { stop-color: #D9822B; }
+.nodo[data-state='permission'] .cloud { animation: nodo-wobble .9s ease-in-out infinite; }
+.nodo[data-state='done'] .face .f-idle { display: none; }
+.nodo[data-state='done'] .face .f-done { display: inline; }
+.nodo[data-state='done'] .cloud { animation: nodo-pop .9s ease-out infinite; }
+.nodo[data-state='error'] .face .f-idle { display: none; }
+.nodo[data-state='error'] .face .f-err { display: inline; }
+.nodo[data-state='error'] .stop-top { stop-color: #FFA3A3; }
+.nodo[data-state='error'] .stop-mid { stop-color: #F26B6B; }
+.nodo[data-state='error'] .stop-bot { stop-color: #C93A4A; }
+.nodo[data-state='error'] .cloud { animation: chispa-shake .2s steps(2) infinite; }
+.nodo[data-state='sleeping'] .face .f-idle { display: none; }
+.nodo[data-state='sleeping'] .face .f-sleep { display: inline; }
+.nodo[data-state='sleeping'] .stop-top { stop-color: #6F6A9A; }
+.nodo[data-state='sleeping'] .stop-mid { stop-color: #55608F; }
+.nodo[data-state='sleeping'] .stop-bot { stop-color: #36407A; }
+.nodo[data-state='sleeping'] .zz { display: inline; animation: mascot-float 2.4s ease-in-out infinite; }
+.nodo .zz { display: none; }
+.nodo.glitch .stop-top { stop-color: #FF84E8; }
+.nodo.glitch .stop-mid { stop-color: #63E8FF; }
+.nodo.glitch .stop-bot { stop-color: #5263FF; }
+.calm *, .calm *::before { animation: none !important; transition: none !important; }
+.nodo.calm .face, .nodo.calm .gaze { transform: none !important; }
+.calm #v3-nodo .face, .calm #v3-nodo .gaze { transform: none !important; }
+@media (prefers-reduced-motion: reduce) { .chispa, .nodo { animation: none !important; transition: none !important; } }
+
+@keyframes chispa-bob { 50% { transform: translateY(-1px); } }
+@keyframes mascot-dot { 0% { opacity: .25; } 33% { opacity: 1; } 66% { opacity: .25; } }
+@keyframes chispa-scan { 0% { transform: translateX(-1px); } 50% { transform: translateX(1px); } }
+@keyframes chispa-scribble { 50% { transform: translateY(-1px); } }
+@keyframes chispa-walk-a { 50% { transform: translateY(-1px); } }
+@keyframes chispa-walk-b { 0% { transform: translateY(-1px); } 50% { transform: translateY(0); } }
+@keyframes chispa-wave { 0% { transform: translateY(-5px); } 50% { transform: translateY(-6px) translateX(1px); } }
+@keyframes chispa-hop { 0%,100% { transform: translateY(0); } 25% { transform: translateY(-2px); } 50% { transform: translateY(-3px); } 75% { transform: translateY(-1px); } }
+@keyframes chispa-shake { 50% { transform: translateX(1px); } }
+@keyframes mascot-blink { 50% { opacity: .2; } }
+@keyframes mascot-float { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-3px); opacity: .2; } }
+@keyframes nodo-cursor { 50% { opacity: 0; } }
+@keyframes nodo-breathe { 50% { transform: scale(1.03); } }
+@keyframes nodo-sway { 25% { transform: rotate(-8deg); } 75% { transform: rotate(8deg); } }
+@keyframes nodo-look { 50% { transform: translateX(6px); } }
+@keyframes nodo-type { 0% { transform: scaleX(.35); } 50% { transform: scaleX(.7); } 100% { transform: scaleX(1); } }
+@keyframes nodo-wobble { 25% { transform: rotate(-6deg); } 75% { transform: rotate(6deg); } }
+@keyframes nodo-pop { 0% { transform: scale(1); } 30% { transform: scale(1.1); } 100% { transform: scale(1); } }

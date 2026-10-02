@@ -1,0 +1,7 @@
+{"timestamp":"2026-10-02T10:00:00Z","ordinal":1,"type":"session_meta","payload":{"session_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","cwd":"fixture-project","cli_version":"0.159.2","originator":"Codex Desktop"}}
+{"timestamp":"2026-10-02T10:00:00Z","ordinal":2,"type":"turn_context","payload":{"turn_id":"fixture-turn-1","cwd":"fixture-project","model":"gpt-test","effort":"medium"}}
+{"timestamp":"2026-10-02T10:00:00Z","ordinal":3,"type":"event_msg","payload":{"type":"task_started","turn_id":"fixture-turn-1","started_at":"2026-10-02T10:00:00Z"}}
+{"timestamp":"2026-10-02T10:00:00Z","ordinal":4,"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"total_tokens":123}}}}
+{"timestamp":"2026-10-02T10:00:01Z","ordinal":5,"type":"response_item","payload":{"type":"custom_tool_call","name":"exec","call_id":"fixture-call-1","input":"mvn test"}}
+{"timestamp":"2026-10-02T10:00:02Z","ordinal":6,"type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"fixture-call-1","output":[{"type":"input_text","text":"Tests passed"}]}}
+{"timestamp":"2026-10-02T10:00:03Z","ordinal":7,"type":"event_msg","payload":{"type":"task_complete","turn_id":"fixture-turn-1","last_agent_message":"Finished fixture work","duration_ms":1000}}

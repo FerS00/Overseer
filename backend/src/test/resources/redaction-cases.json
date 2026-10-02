@@ -1,0 +1,20 @@
+{
+  "positive": [
+    { "input": "key sk-abc123456789", "expected": "key sk-***" },
+    { "input": "sk-proj-abc123456789 sk-ant-abc123456789", "expected": "sk-*** sk-***" },
+    { "input": "ghp_abcdefgh1234 gho_abcdefgh1234 ghs_abcdefgh1234", "expected": "ghp_*** gho_*** ghs_***" },
+    { "input": "github_pat_abcdefgh1234", "expected": "github_pat_***" },
+    { "input": "AKIA1234567890ABCDEF", "expected": "AKIA***" },
+    { "input": "Authorization: Bearer eyJhbGciOiJabc.def_123", "expected": "Authorization: ***" },
+    { "input": "Bearer abc.def_123", "expected": "Bearer ***" },
+    { "input": "PASSWORD=secret PASSWD: \"secret two\" token='three words' SECRET : four API_KEY=abc", "expected": "PASSWORD=*** PASSWD=*** TOKEN=*** SECRET=*** API_KEY=***" },
+    { "input": "-----BEGIN PRIVATE KEY-----\nprivate-material\n-----END PRIVATE KEY-----", "expected": "[clave privada redactada]" },
+    { "input": "-----BEGIN RSA PRIVATE KEY-----private-material-----END RSA PRIVATE KEY-----", "expected": "[clave privada redactada]" }
+  ],
+  "negative": [
+    "task skeleton token_count password reset flow",
+    "TOKENIZER and API_KEY_NAME are identifiers, not assignments",
+    "ordinary Bearer authentication explanation",
+    "AKIA123 is too short"
+  ]
+}

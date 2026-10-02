@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: agent-ops-phase1-test
+  config:
+    import: optional:file:target/phase1-hermetic/.env[.properties]
+  datasource:
+    url: jdbc:h2:mem:phase1;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+server:
+  address: ${AGENT_OPS_BIND:127.0.0.1}
+  port: 0
+agent-ops:
+  events-file: target/phase1-events.ndjson
+  cors: http://localhost:4200
+  codex-sessions: target/phase1-rollouts
+  codex-watcher-enabled: true
+  retention-days: 14

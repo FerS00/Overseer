@@ -1,0 +1,4 @@
+[
+  { "id": "claude", "name": "Claude Code", "mascot": "chispa", "color": "#EE8B66", "integrations": ["hooks"], "hook": "node hook.mjs claude" },
+  { "id": "codex", "name": "Codex", "mascot": "nodo", "color": "#8FA2FF", "integrations": ["hooks", "rollouts"], "hook": "node hook.mjs codex" }
+]

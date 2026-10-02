@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: agent-ops
+  config:
+    import: "optional:file:.env[.properties],optional:file:../.env[.properties]"
+  datasource:
+    url: ${AGENT_OPS_DB_URL:jdbc:h2:file:./data/agentops;AUTO_SERVER=TRUE}
+    username: ${AGENT_OPS_DB_USER:sa}
+    password: ${AGENT_OPS_DB_PASS:}
+    driver-class-name: ${AGENT_OPS_DB_DRIVER:org.h2.Driver}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+server:
+  port: ${AGENT_OPS_PORT:8787}
+  address: ${AGENT_OPS_BIND:127.0.0.1}
+
+agent-ops:
+  events-file: ${AGENT_OPS_EVENTS_FILE:${user.home}/.agent-ops/events.ndjson}
+  cors: ${AGENT_OPS_CORS:http://localhost:4200,http://127.0.0.1:4200}
+  codex-sessions: ${AGENT_OPS_CODEX_SESSIONS:${user.home}/.codex/sessions}
+  codex-watcher-enabled: ${AGENT_OPS_CODEX_WATCHER_ENABLED:true}
+  token-file: ${AGENT_OPS_TOKEN_FILE:${user.home}/.agent-ops/token}
+  retention-days: ${AGENT_OPS_RETENTION_DAYS:14}
+  session-idle-minutes: ${AGENT_OPS_SESSION_IDLE_MINUTES:10}
+
+logging:
+  level:
+    root: info
+    com.agentops: info
