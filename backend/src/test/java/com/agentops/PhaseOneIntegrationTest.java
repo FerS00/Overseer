@@ -115,7 +115,33 @@ class PhaseOneIntegrationTest {
         .andExpect(jsonPath("$.layout").value("focus"))
         .andExpect(jsonPath("$.density").value("compact"));
 
-    assertThat(new UiPreferencesService(jdbc, mapper).get()).isEqualTo(preferences);
+    assertThat(new UiPreferencesService(jdbc, mapper).get()).containsAllEntriesOf(preferences)
+        .containsEntry("viewMode", "cabins").containsEntry("dockHiddenAgents", List.of()).containsEntry("dockSize", "normal");
+  }
+
+  @Test
+  void olderClientsKeepStoredDockOptionsAndInvalidDockOptionsAreRejected() throws Exception {
+    Map<String, Object> dock = new HashMap<>(UiPreferencesService.defaults());
+    dock.put("viewMode", "dock"); dock.put("dockHiddenAgents", List.of("codex")); dock.put("dockSize", "compact");
+    mockMvc.perform(put("/api/preferences").contentType("application/json").content(mapper.writeValueAsBytes(dock)))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.viewMode").value("dock"));
+
+    Map<String, Object> legacy = Map.of("agentOrder", List.of("codex", "claude", "antigravity", "deepseek"),
+        "hiddenAgents", List.of(), "layout", "row", "density", "normal", "focusAgent", "claude");
+    mockMvc.perform(put("/api/preferences").contentType("application/json").content(mapper.writeValueAsBytes(legacy)))
+        .andExpect(status().isOk());
+    mockMvc.perform(get("/api/preferences"))
+        .andExpect(jsonPath("$.agentOrder[0]").value("codex")).andExpect(jsonPath("$.layout").value("row"))
+        .andExpect(jsonPath("$.viewMode").value("dock")).andExpect(jsonPath("$.dockHiddenAgents[0]").value("codex"))
+        .andExpect(jsonPath("$.dockSize").value("compact"));
+
+    Map<String, Object> floating = new HashMap<>(legacy); floating.put("viewMode", "floating");
+    mockMvc.perform(put("/api/preferences").contentType("application/json").content(mapper.writeValueAsBytes(floating)))
+        .andExpect(status().isBadRequest());
+    Map<String, Object> repeated = new HashMap<>(legacy); repeated.put("dockHiddenAgents", List.of("claude", "claude"));
+    mockMvc.perform(put("/api/preferences").contentType("application/json").content(mapper.writeValueAsBytes(repeated)))
+        .andExpect(status().isBadRequest());
+    mockMvc.perform(get("/api/preferences")).andExpect(jsonPath("$.viewMode").value("dock"));
   }
 
   @Test

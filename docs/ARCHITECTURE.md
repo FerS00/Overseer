@@ -77,8 +77,18 @@ The Playwright suite compares all five SVGs, visible shapes, gradient colors, an
 
 The catalog pairs Claude Code with Chispa, Codex with Nodo, Antigravity with Astro, and DeepSeek Harness with Hondo. Michi summarizes visible agent state with error > permission > active > done > sleeping > idle priority.
 
+### Activity sub-states and the dock
+
+`activity.ts` classifies reading, editing and running events into twelve sub-states from the tool name and the shell command (`meta.command`, or the event detail for shell tools). Compound commands are classified by their last segment, so `npm ci && npm test` counts as tests. `describeTarget` picks the file, files, tree, URL, command or subagents shown to the user, using only fields the backend has already redacted. Antigravity and DeepSeek file, search and web tools (`view_file`, `list_dir`, `grep_search`, `replace_file_content`, …) map to reading or editing in the base classifier.
+
+`MascotStateService` publishes a snapshot per agent with the state, sub-state, target, tool, session, active subagents (child sessions plus Claude Code SubagentStart/Stop notes) and `stateSince`, which only moves when the state/sub-state pair changes. Snapshots share the four-per-second publication limit with the states.
+
+`AgentPetComponent` wraps a mascot: `data-activity` drives CSS container motion and `DwellScheduler` plays a glance, stretch or shuffle every 6–11 s after 20 s in the same active sub-state. It registers with `MascotEngine`, so the dock still uses the single shared loop, and does nothing in calm mode. Dock rings and flyout clocks use the existing one-second clock with a CSS transition.
+
+`DockBarComponent` renders the slots for detected agents that are not hidden in the dock, in `agentOrder`, with roving focus. `AgentFlyoutComponent` is a non-modal dialog positioned under its slot and clamped to the viewport. `ViewSettingsComponent` is a native modal `<dialog>`. `PreferencesService` owns loading, partial updates, serialized PUTs and the browser copy, and starts from that copy so dock mode does not flash the cabins.
+
 ### Interaction and preference ordering
 
-Cabin selection is an ephemeral signal. A batch hide performs one hiddenAgents update and one queued PUT, keeping all unselected agents and the event history intact. The native details/summary menu exposes the same reordering operation as dragging, with keyboard/touch buttons. Reordering visible cabins preserves hidden positions. The backend contract is unchanged. Loaded agentOrder retains the saved sequence, filters unknown/duplicate ids, and appends missing supported ids. Saves are serialized to prevent a slower older request from overwriting a newer view.
+Cabin selection is an ephemeral signal. A batch hide performs one hiddenAgents update and one queued PUT, keeping all unselected agents and the event history intact. The native details/summary menu exposes the same reordering operation as dragging, with keyboard/touch buttons. Reordering visible cabins preserves hidden positions. The dock fields (`viewMode`, `dockHiddenAgents`, `dockSize`) are optional in `PUT /api/preferences`; the server merges the request over the stored document before validating it. Loaded agentOrder retains the saved sequence, filters unknown/duplicate ids, and appends missing supported ids. Saves are serialized to prevent a slower older request from overwriting a newer view.
 
 Historical database queries use parameter placeholders derived from AgentProfiles, so all four supported agents survive cache misses, pagination, and restart. Unregistered stored agents remain excluded.

@@ -43,3 +43,27 @@ Support four-agent monitoring and interactive cabin customization
 Incluir fuentes, pruebas, migración V5, documentación, referencia de diseño y PNG del repositorio. El diseño aportado por el usuario se conserva y se incluye como referencia, sin atribución automática. `.env`, datos, credenciales, configuraciones globales, informes temporales, grafo y checkpoint/plan locales permanecen fuera del staging según la política del repositorio. El usuario autorizó commit y push normal a `origin/main` el 2026-10-03; el hash y la publicación se comprueban en el historial Git y en el remoto.
 
 Corrección de imágenes del README: las once capturas se regeneraron desde la aplicación local con el diseño 4c y se publican con nombres `*-v4c.png`. Se sustituyen las URLs reutilizadas del diseño anterior, preservando los encabezados y subsecciones. Las capturas usan datos de ejemplo aislados; no modifican preferencias reales. La caché como origen de la visualización antigua no pudo confirmarse.
+
+## Revisión 5: dock, flyout, subestados y ajustes (fases 17–22)
+
+Estado de verificación: **Aprobado en local** (2026-10-04), rama `claude/dock-phases-17-22`.
+
+### Cambios
+
+- Preferencias: `viewMode`, `dockHiddenAgents` y `dockSize` opcionales; el servidor fusiona escrituras parciales para que un cliente antiguo no borre las opciones del dock. `PreferencesService` sustituye la lógica de preferencias de `AppComponent`.
+- Doce subestados de leer, editar y ejecutar con insignia, movimiento del contenedor y variaciones por permanencia dentro del bucle único de `MascotEngine`. Las cabinas muestran la insignia y el subestado.
+- Modo dock con ranuras accesibles por teclado, anillo de tiempo, etiqueta de texto y flyout por agente con la tarea exacta, tiempos y eventos recientes.
+- Diálogo «Ajustes de vista» para vista, visibilidad en el dock, orden compartido, tamaño y modo calma.
+- Herramientas de Antigravity y DeepSeek de lectura y edición ya no se muestran como «ejecutando».
+- README, guía, configuración, arquitectura, DESIGN.md y plan actualizados; capturas regeneradas y cuatro capturas nuevas del dock (`dock-*-v5.png`).
+
+### Verificación ejecutada
+
+| Comprobación | Resultado |
+|---|---|
+| Maven | 36 aprobadas |
+| Vitest | 113 aprobadas |
+| Playwright (Chromium local, sin canal Chrome) | 25 aprobadas: 16 existentes y 9 del dock |
+| Angular producción | Build aprobado |
+
+No se ejecutaron Docker, sesiones reales de los agentes, Semgrep ni las pruebas de `integrations/` (sin cambios en esa carpeta). Las pruebas se ejecutaron con Node 24.21 porque Angular CLI rechaza el Node 22.22.0 del entorno.

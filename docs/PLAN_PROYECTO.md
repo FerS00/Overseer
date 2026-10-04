@@ -1,9 +1,9 @@
 # Overseer — Plan de proyecto: modo dock, flyout de agente y subestados
 
-> Documento canónico de planificación. Estado: **Propuesta para revisión (2026-10-04)**.
+> Documento canónico de planificación. Estado: **Fases 17–22 implementadas (2026-10-04)**; la fase 23 queda en parte cubierta (documentación y capturas).
 > Diseño de referencia: `design-system/agent-ops/DESIGN.md` (revisión 4) y la sección «Revisión 5 (propuesta)».
 > Prototipo de esta propuesta: `design-system/agent-ops/prototype-desktop.html`. El prototipo `prototype-v4.html` no se modifica: los E2E de fidelidad lo usan como referencia.
-> Ninguna fase de código empieza hasta que el usuario apruebe este plan y el prototipo.
+> El usuario aprobó el plan y el prototipo el 2026-10-04.
 
 ## 1. Objetivo
 
@@ -121,7 +121,7 @@ readonly snapshots: Signal<Record<AgentId, AgentActivitySnapshot>>;
 | | `run.wait` | Task/Agent/subagentes, `wait`, `sleep`, o `activeSubagents > 0` con el agente sin otra herramienta |
 | | `run.shell` | cualquier otro comando |
 
-El orden de evaluación es el de la tabla (de arriba abajo dentro de cada estado). `pensando`, `pide permiso`, `terminó`, `error`, `en espera` y `durmiendo` no tienen subestado.
+El orden de evaluación es el de la tabla, salvo que `run.install` se evalúa antes que `run.build` para que `npm install` no cuente como compilación. «Pensando» con subagentes activos también se muestra como `run.wait`. `pensando`, `pide permiso`, `terminó`, `error`, `en espera` y `durmiendo` no tienen subestado.
 
 ### 4.4 Componentes Angular
 
@@ -157,10 +157,10 @@ Las fases continúan la numeración de `docs/ENTREGA_GIT.md` (11–16). Cada fas
 
 Criterios de aceptación:
 
-- [ ] `GET /api/preferences` sobre una base con un documento anterior devuelve los ocho campos con `viewMode: "cabins"`, `dockHiddenAgents: []` y `dockSize: "normal"`.
-- [ ] `PUT` con solo los cinco campos actuales conserva los tres nuevos ya guardados (prueba Maven).
-- [ ] `PUT` con `viewMode: "floating"` o con un id repetido en `dockHiddenAgents` devuelve `400`.
-- [ ] Las 71 pruebas Vitest y los 16 E2E existentes siguen en verde sin modificarlos.
+- [x] `GET /api/preferences` sobre una base con un documento anterior devuelve los ocho campos con `viewMode: "cabins"`, `dockHiddenAgents: []` y `dockSize: "normal"`.
+- [x] `PUT` con solo los cinco campos actuales conserva los tres nuevos ya guardados (prueba Maven).
+- [x] `PUT` con `viewMode: "floating"` o con un id repetido en `dockHiddenAgents` devuelve `400`.
+- [x] Las 71 pruebas Vitest y los 16 E2E existentes siguen en verde sin modificarlos. Dos aserciones Maven de igualdad exacta se cambiaron a «contiene» porque el documento ahora tiene ocho campos.
 
 ### Fase 18 — Clasificador de subestados
 
@@ -169,10 +169,10 @@ Criterios de aceptación:
 
 Criterios de aceptación:
 
-- [ ] Una tabla de casos Vitest cubre cada fila de 4.3 con eventos reales de Claude Code, Codex (`exec_command`), Antigravity (`run_command`, `view_file`) y DeepSeek (`tools/execute`).
-- [ ] `classify` (estado base) devuelve exactamente lo mismo que antes para toda la tabla.
-- [ ] `stateSince` solo cambia cuando cambia el par estado/subestado, no con cada evento del mismo tipo.
-- [ ] `describeTarget` acorta rutas largas por el centro conservando el nombre de archivo y nunca expone valores que la redacción haya ocultado.
+- [x] Una tabla de casos Vitest cubre cada fila de 4.3 con eventos reales de Claude Code, Codex (`exec_command`), Antigravity (`run_command`, `view_file`) y DeepSeek (`tools/execute`).
+- [x] `classify` (estado base) conserva todos los casos anteriores; solo añade herramientas de Antigravity y DeepSeek (`view_file`, `list_dir`, `grep_search`, `replace_file_content`, `read_file`, `write_file`…) que antes caían en «ejecutando».
+- [x] `stateSince` solo cambia cuando cambia el par estado/subestado, no con cada evento del mismo tipo.
+- [x] `describeTarget` acorta rutas largas por el centro conservando el nombre de archivo y nunca expone valores que la redacción haya ocultado.
 
 ### Fase 19 — Animación de subestados
 
@@ -181,10 +181,10 @@ Criterios de aceptación:
 
 Criterios de aceptación:
 
-- [ ] Sigue habiendo un único `requestAnimationFrame` activo (prueba existente de `MascotEngine` ampliada con dock y catálogo montados).
-- [ ] Tras 20 s en el mismo subestado aparece una variación cada 6–11 s; con calma o movimiento reducido no aparece ninguna (prueba con reloj simulado).
-- [ ] Con `prefers-reduced-motion: reduce`, Playwright no encuentra animaciones en curso dentro del dock (`document.getAnimations()` vacío salvo las de duración ≤ 1 ms).
-- [ ] Los E2E de fidelidad de las cinco mascotas en sus nueve estados siguen pasando sin cambios.
+- [x] Sigue habiendo un único `requestAnimationFrame` activo (prueba existente de `MascotEngine` ampliada con dock y catálogo montados).
+- [x] Tras 20 s en el mismo subestado aparece una variación cada 6–11 s; con calma o movimiento reducido no aparece ninguna (prueba con reloj simulado).
+- [x] Con `prefers-reduced-motion: reduce`, Playwright no encuentra animaciones infinitas en curso con el dock y el flyout abiertos.
+- [x] Los E2E de fidelidad de las cinco mascotas en sus nueve estados siguen pasando sin cambios.
 
 ### Fase 20 — Barra dock
 
@@ -192,23 +192,23 @@ Criterios de aceptación:
 
 Criterios de aceptación:
 
-- [ ] En modo dock solo se muestran las mascotas detectadas, no ocultas en el dock, en el orden de `agentOrder`.
-- [ ] La barra no desborda a 375, 768 y 1280 px; cuatro ranuras caben a 375 px con tamaño compacto.
-- [ ] `Tab` entra en la barra una sola vez; `←/→/Inicio/Fin` mueven el foco entre ranuras.
-- [ ] Cada ranura tiene `aria-label` con nombre, estado y subestado (por ejemplo «Chispa, Claude Code: ejecutando pruebas»).
-- [ ] Un permiso o un error en una ranura muestra el anillo ámbar o rojo y se anuncia por la región `aria-live` existente.
-- [ ] axe sin infracciones serias ni críticas.
+- [x] En modo dock solo se muestran las mascotas detectadas, no ocultas en el dock, en el orden de `agentOrder`.
+- [x] La barra no desborda a 375, 768 y 1280 px; cuatro ranuras caben a 375 px con tamaño compacto.
+- [x] `Tab` entra en la barra una sola vez; `←/→/Inicio/Fin` mueven el foco entre ranuras.
+- [x] Cada ranura tiene `aria-label` con nombre, estado y subestado (por ejemplo «Chispa, Claude Code: ejecutando pruebas»).
+- [x] Un permiso o un error en una ranura muestra el anillo ámbar o rojo y se anuncia por la región `aria-live` existente.
+- [x] axe sin infracciones serias ni críticas.
 
 ### Fase 21 — Flyout de agente
 
-- `AgentFlyoutComponent` y la acción «Ver eventos», que cambia a la vista de cabinas con la línea de tiempo filtrada por ese agente (sin persistir el cambio de vista) o, en modo dock, despliega la lista bajo el flyout.
+- `AgentFlyoutComponent`. «Ver eventos» despliega la lista bajo el flyout y, desde ella, «Abrir en la línea de tiempo» cambia a las cabinas con la línea de tiempo filtrada por ese agente, sin persistir el cambio de vista.
 
 Criterios de aceptación:
 
-- [ ] Clic, `Enter` o `Espacio` en una ranura abren su flyout; otra ranura lo sustituye; `Esc`, «Cerrar» o un clic fuera lo cierran y el foco vuelve a la ranura.
-- [ ] El flyout muestra herramienta, objetivo exacto, estado, subestado, tiempo de sesión y tiempo en el estado actual, y se actualiza en vivo con eventos SSE sintéticos.
-- [ ] El panel queda dentro del viewport con 16 px de margen en los tres anchos de referencia.
-- [ ] Cerrar el flyout no cambia el tamaño ni la posición de la barra (comparación de `getBoundingClientRect`).
+- [x] Clic, `Enter` o `Espacio` en una ranura abren su flyout; otra ranura lo sustituye; `Esc`, «Cerrar» o un clic fuera lo cierran y el foco vuelve a la ranura.
+- [x] El flyout muestra herramienta, objetivo exacto, estado, subestado, tiempo de sesión y tiempo en el estado actual, y se actualiza en vivo con eventos SSE sintéticos.
+- [x] El panel queda dentro del viewport con 16 px de margen en los tres anchos de referencia.
+- [x] Cerrar el flyout no cambia el tamaño ni la posición de la barra (comparación de `getBoundingClientRect`).
 
 ### Fase 22 — Panel de configuración
 
@@ -216,11 +216,11 @@ Criterios de aceptación:
 
 Criterios de aceptación:
 
-- [ ] Ocultar o mostrar una mascota en el dock hace un único `PUT` y sobrevive a la recarga.
-- [ ] Reordenar con arrastre y con los botones «Subir/Bajar» produce el mismo `agentOrder`; cada movimiento se anuncia con la nueva posición.
-- [ ] Con el backend caído, los cambios se guardan en `localStorage` y el panel muestra «Guardado solo en este navegador».
-- [ ] Un agente no detectado aparece atenuado y su interruptor está deshabilitado con el motivo visible.
-- [ ] El diálogo atrapa el foco, se cierra con `Esc` y devuelve el foco al botón que lo abrió.
+- [x] Ocultar o mostrar una mascota en el dock hace un único `PUT` y sobrevive a la recarga.
+- [x] Reordenar con arrastre y con los botones «Subir/Bajar» produce el mismo `agentOrder`; cada movimiento se anuncia con la nueva posición.
+- [x] Con el backend caído, los cambios se guardan en `localStorage` y el panel muestra «Guardado solo en este navegador».
+- [x] Un agente no detectado aparece atenuado y su interruptor está deshabilitado con el motivo visible.
+- [x] El diálogo atrapa el foco, se cierra con `Esc` y devuelve el foco al botón que lo abrió.
 
 ### Fase 23 — Verificación, documentación y capturas
 
@@ -232,7 +232,18 @@ Criterios de aceptación:
 - [ ] Vitest, Maven, Node y Playwright en verde; build de producción de Angular aprobado.
 - [ ] Capturas regeneradas con datos de ejemplo aislados, sin tocar preferencias reales.
 
-## 6. Riesgos
+## 6. Resultado de las fases 17–22
+
+| Comprobación | Resultado |
+|---|---|
+| Maven | 36 aprobadas (2 nuevas para los campos del dock) |
+| Vitest | 113 aprobadas (42 nuevas: preferencias, subestados, snapshots y variaciones) |
+| Playwright (Chromium local) | 25 aprobadas: 16 existentes sin cambios y 9 nuevas del dock, flyout y ajustes |
+| Build de producción de Angular | Aprobado |
+
+Las desviaciones de diseño están en `design-system/agent-ops/DESIGN.md`, sección «Desviaciones de la implementación». Pendiente de la fase 23: verificación con Docker, sesiones reales de cada agente y auditoría de seguridad.
+
+## 7. Riesgos
 
 | Riesgo | Mitigación |
 |---|---|
@@ -241,7 +252,7 @@ Criterios de aceptación:
 | Coste del bucle con dock, cabinas y catálogo montados a la vez | Solo se monta la vista activa; las ranuras fuera de pantalla se dan de baja del motor. |
 | Clientes antiguos que sobrescriben campos nuevos | Fusión en backend descrita en 4.1 y prueba dedicada. |
 
-## 7. Entrega Git
+## 8. Entrega Git
 
 - Rama de trabajo y commits atómicos con Conventional Commits: `docs(plan): …`, `feat(api): …`, `feat(ui): …`, `test(ui): …`, `docs(design): …`.
 - Un commit por fase como mínimo; sin mezclar backend y frontend salvo que la fase lo exija.

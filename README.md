@@ -17,7 +17,7 @@
 ---
 
 ### Overview
-> Overseer is a local, real-time, read-only monitor for Claude Code, Codex, Antigravity, and DeepSeek Harness. It shows installed agents, their sessions, and a filterable event timeline. Customize directly on each cabin: drag its handle to reorder, select several checkboxes to hide them together, or open its options for focus, layout, density, and keyboard movement. Hidden agents have recovery buttons. The layout rearranges as cabins are hidden or restored: a single cabin stays centered, and three cabins place the last one below the centered pair.
+> Overseer is a local, real-time, read-only monitor for Claude Code, Codex, Antigravity, and DeepSeek Harness. It shows installed agents, their sessions, and a filterable event timeline. Customize directly on each cabin: drag its handle to reorder, select several checkboxes to hide them together, or open its options for focus, layout, density, and keyboard movement. Hidden agents have recovery buttons. The layout rearranges as cabins are hidden or restored: a single cabin stays centered, and three cabins place the last one below the centered pair. A compact **dock view** keeps only the mascots in a bar at the top of the window; each mascot opens a panel with the exact task in progress.
 
 ---
 
@@ -47,6 +47,24 @@ Astro is the pink orbital character for Antigravity.
 
 Hondo is the blue character for DeepSeek Harness. Each agent mascot shows idle, thinking, reading, editing, running, permission, done, error, and sleeping states.
 
+### Dock view
+![Dock with four agents](docs/images/dock-v5.png)
+
+Switch to the dock from **Ajustes de vista**. Each slot shows the mascot inside a ring that fills once per minute in the same state, a sub-state badge and a short label, so the state never depends on the mascot alone. Arrow keys move between slots.
+
+![Agent flyout](docs/images/dock-flyout-v5.png)
+
+Click or press Enter on a slot to open its panel: tool, exact target (file, command, URL, tree or subagents), session and state durations, and recent events. Escape closes it and returns focus to the slot.
+
+![View settings](docs/images/dock-settings-v5.png)
+
+The settings dialog chooses dock or cabins, shows or hides each mascot in the dock, reorders agents for both views by drag or Up/Down, sets the dock size and calm mode.
+
+<img src="docs/images/dock-mobile-v5.png" alt="Dock and panel on a phone" width="320">
+
+Reading, editing and running have twelve sub-states (for example running tests, building, installing dependencies, waiting on subagents, batch reading or a single file). Each adds a badge and a small movement around the mascot, and long tasks get occasional variations so they never look frozen. Calm mode and reduced motion turn all of it off.
+
+### Cabins and timeline
 ![Timeline event detail](docs/images/timeline-detail-v4c.png)
 
 ![Three visible cabins](docs/images/layout-three-v4c.png)
@@ -69,8 +87,9 @@ Hondo is the blue character for DeepSeek Harness. Each agent mascot shows idle, 
 - **Local access by default:** the ingest endpoint requires a local token, and the standalone server binds to `127.0.0.1` by default.
 - **Bounded history:** event retention defaults to 14 days; set `AGENT_OPS_RETENTION_DAYS=0` to disable deletion. In-memory event buffers are bounded.
 - **Tracked sessions:** sessions are `active`, `idle`, or `ended`; the idle threshold defaults to 10 minutes.
-- **Team detection and view preferences:** installation markers drive the catalog shown in the UI. Agent order, visibility, layout, and density persist through `GET/PUT /api/preferences` and fall back to browser storage.
-- **One mascot animation loop:** mascots share one `requestAnimationFrame` loop and one passive `pointermove` listener. Calm mode and `prefers-reduced-motion` stop continuous animation.
+- **Team detection and view preferences:** installation markers drive the catalog shown in the UI. Agent order, visibility, layout, density, view mode (cabins or dock), dock visibility and dock size persist through `GET/PUT /api/preferences` and fall back to browser storage. The server merges partial writes, so older clients keep the dock options.
+- **Sub-states as a layer:** a pure classifier derives twelve read/edit/run sub-states from the tool and command (the last segment of compound commands wins). They add a badge and container motion; the nine mascot states and their drawings stay unchanged.
+- **One mascot animation loop:** mascots, dock slots and dwell variations share one `requestAnimationFrame` loop and one passive `pointermove` listener. Calm mode and `prefers-reduced-motion` stop continuous animation.
 - **Prototype fidelity:** the five SVG drawings and their state-specific colors, expressions, and animations follow `design-system/agent-ops/prototype-v4.html`. Browser regression checks compare geometry and animation keyframes against that reference in all nine states, and exercise pointer tracking, clicks, and live SSE state changes.
 - **Container defaults:** Docker Compose uses H2 and runs the app as a non-root user. The host port is published on loopback.
 - **Compatibility names:** Java package `com.agentops`, `spring.application.name`, `AGENT_OPS_*` variables, `~/.agent-ops/`, `X-Agent-Ops-Token`, Compose container `agent-ops`, the JAR name, npm package name, and `design-system/agent-ops/` remain unchanged for compatibility.

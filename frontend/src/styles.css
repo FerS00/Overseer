@@ -2,6 +2,7 @@
 @import '@fontsource-variable/ibm-plex-sans';
 @import '@fontsource-variable/jetbrains-mono';
 @import './app/mascots/mascots.css';
+@import './app/dock/dock.css';
 
 :root {
   color-scheme: dark;

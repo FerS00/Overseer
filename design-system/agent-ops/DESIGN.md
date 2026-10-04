@@ -270,7 +270,7 @@ Nada de rasgos infantiles (rubor, sonrisas, gotas decorativas, ojos con brillo).
 
 ---
 
-## Revisión 5 (propuesta, pendiente de aprobación, 2026-10-04)
+## Revisión 5 (aprobada e implementada, 2026-10-04)
 
 Petición del usuario: una vista compacta de escritorio anclada arriba que muestre solo las mascotas, un panel por agente con la tarea exacta, subestados para que las tareas largas no se vean iguales y un panel para gestionar visibilidad, orden y vista. Plan técnico y criterios de aceptación: `docs/PLAN_PROYECTO.md` (fases 17–23). Prototipo: `prototype-desktop.html`. Las mascotas, sus nueve estados y los tokens de la revisión 4 no cambian.
 
@@ -310,5 +310,15 @@ Petición del usuario: una vista compacta de escritorio anclada arriba que muest
 
 | Punto | Detalle |
 |---|---|
-| Aprobación | El usuario debe aprobar el prototipo antes de la fase 17. |
+| Aprobación | Aprobada por el usuario el 2026-10-04; implementada en las fases 17–22. |
 | Ventana nativa | Una ventana de escritorio siempre visible queda fuera de esta revisión. |
+
+### Desviaciones de la implementación
+
+| Punto | Prototipo / plan | Implementación | Motivo |
+|---|---|---|---|
+| Anillo de tiempo y relojes | Bucle de animación a 4 Hz; en calma, sustituido por texto | Reloj existente de 1 s con transición CSS de 1 s; en calma se actualiza sin transición | El anillo se actualiza sin animación continua y sigue siendo legible en calma. |
+| Indicador de conexión | No existía en el dock | Punto de conexión junto al botón de ajustes | En modo dock no se ve la cabecera. |
+| «Ver eventos» | Lista bajo el flyout | Lista bajo el flyout y botón «Abrir en la línea de tiempo» | Da acceso a filtros y detalle sin guardar el cambio de vista. |
+| Esperando subagentes | Solo con Task/Agent | También en «pensando» con subagentes activos | Claude Code sigue pensando mientras los subagentes trabajan. |
+| Herramientas de Antigravity y DeepSeek | — | `view_file`, `list_dir`, `grep_search`, `replace_file_content`… pasan a leyendo/editando | Antes caían en «ejecutando». |

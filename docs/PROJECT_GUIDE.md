@@ -90,15 +90,17 @@ Keyboard shortcuts are disabled while typing in a form field:
 | `Esc` | Close event detail or help. |
 | `?` | Open shortcut help. |
 
+Open **Ajustes de vista** (gear button in the top bar or in the dock) to switch between the cabins and the **dock view**, choose which mascots appear in the dock, reorder agents for both views, change the dock size, and toggle calm mode. In the dock, `Tab` enters the bar once, arrow keys and `Home`/`End` move between slots, and `Enter` opens the agent panel; `Esc` closes it. **Abrir en la línea de tiempo** in the panel shows the cabins filtered by that agent without changing the saved view; **Volver al dock** returns. Global shortcuts are ignored while focus is in the dock or a dialog.
+
 Select cabin checkboxes to hide several agents together. Restore hidden agents with their recovery buttons. Drag the dotted handle to reorder, or use the cabin options for keyboard movement, focus, layout, and density. There is no permanent customization toolbar. See [direct cabin controls](CONFIGURATION.md#direct-cabin-controls).
 
-The nine mascot states are idle, thinking, reading, editing, running, permission, done, error, and sleeping. Reduced-motion preferences enable calm rendering automatically.
+The nine mascot states are idle, thinking, reading, editing, running, permission, done, error, and sleeping. Reading, editing, and running also show one of twelve sub-states (`read.file`, `read.batch`, `read.tree`, `read.web`, `edit.file`, `edit.multi`, `run.shell`, `run.test`, `run.build`, `run.install`, `run.net`, `run.wait`) as a badge and label. Reduced-motion preferences enable calm rendering automatically.
 
 For Antigravity, use `node integrations/wire-up.mjs --agents antigravity --apply`; each command supplies its event name because the client's stdin payload has no discriminator. For DeepSeek Harness, use `--agents deepseek --apply` with the existing desktop dsh-hooks profile. See [Configuration](CONFIGURATION.md) for client setup and verification limits.
 
 ## HTTP API
 
-The GET routes and SSE stream are read-only. Ingest is token-protected. `GET /api/preferences` reads the saved view; `PUT /api/preferences` saves its order, hiddenAgents, layout, density, and focusAgent locally.
+The GET routes and SSE stream are read-only. Ingest is token-protected. `GET /api/preferences` reads the saved view; `PUT /api/preferences` saves its agentOrder, hiddenAgents, layout, density, focusAgent, viewMode (`cabins` or `dock`), dockHiddenAgents, and dockSize (`normal` or `compact`) locally. The three dock fields are optional: missing fields keep their stored value, and invalid values or repeated ids return `400`.
 
 | Method | Path | Query / headers | Response |
 | :--- | :--- | :--- | :--- |
@@ -131,4 +133,4 @@ npm run e2e
 cd ..; node --test integrations/
 ```
 
-For reproducible synthetic UI screenshots, start the Angular development server and run `npm run screenshots` from `frontend`. The script writes prototype revision 4c PNGs (`*-v4c.png`) to `docs/images/`; README links use these names so old image URLs are not reused; set `BASE_URL` to use another already-running development server.
+For reproducible synthetic UI screenshots, start the Angular development server and run `npm run screenshots` from `frontend`. The script writes prototype revision 4c PNGs (`*-v4c.png`) and the dock captures (`dock-*-v5.png`) to `docs/images/`; set `CHROME_PATH` to use a local Chromium instead of the Chrome channel; README links use these names so old image URLs are not reused; set `BASE_URL` to use another already-running development server.
