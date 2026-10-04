@@ -25,8 +25,12 @@ public class UiPreferencesService {
     catch (Exception invalid) { return defaults(); }
   }
 
+  /** Fields missing from the request keep their stored value, so older clients never erase newer view options. */
   public Map<String, Object> put(Map<String, Object> raw) {
-    Map<String, Object> safe = validate(raw);
+    if (raw == null) throw new IllegalArgumentException("Se requieren preferencias JSON");
+    Map<String, Object> merged = new LinkedHashMap<>(get());
+    merged.putAll(raw);
+    Map<String, Object> safe = validate(merged);
     try {
       String json = mapper.writeValueAsString(safe);
       String updatedAt = Instant.now().toString();
@@ -39,7 +43,8 @@ public class UiPreferencesService {
   public static Map<String, Object> defaults() {
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("agentOrder", IDS); result.put("hiddenAgents", List.of()); result.put("layout", "automatic");
-    result.put("density", "normal"); result.put("focusAgent", "claude"); return result;
+    result.put("density", "normal"); result.put("focusAgent", "claude");
+    result.put("viewMode", "cabins"); result.put("dockHiddenAgents", List.of()); result.put("dockSize", "normal"); return result;
   }
 
   public static Map<String, Object> validate(Map<String, Object> raw) {
@@ -55,8 +60,15 @@ public class UiPreferencesService {
     if (!Set.of("automatic", "row", "focus").contains(layout)) throw new IllegalArgumentException("layout no admitido");
     if (!Set.of("normal", "compact").contains(density)) throw new IllegalArgumentException("density no admitida");
     if (!IDS.contains(focus)) throw new IllegalArgumentException("focusAgent no admitido");
+    String viewMode = raw.containsKey("viewMode") ? string(raw.get("viewMode"), "viewMode") : "cabins";
+    List<String> dockHidden = raw.containsKey("dockHiddenAgents") ? stringList(raw.get("dockHiddenAgents"), "dockHiddenAgents") : List.of();
+    String dockSize = raw.containsKey("dockSize") ? string(raw.get("dockSize"), "dockSize") : "normal";
+    if (!Set.of("cabins", "dock").contains(viewMode)) throw new IllegalArgumentException("viewMode no admitido");
+    if (new HashSet<>(dockHidden).size() != dockHidden.size() || !IDS.containsAll(dockHidden)) throw new IllegalArgumentException("dockHiddenAgents contiene ids duplicados o desconocidos");
+    if (!Set.of("normal", "compact").contains(dockSize)) throw new IllegalArgumentException("dockSize no admitido");
     Map<String, Object> result = new LinkedHashMap<>(); result.put("agentOrder", order); result.put("hiddenAgents", hidden);
-    result.put("layout", layout); result.put("density", density); result.put("focusAgent", focus); return result;
+    result.put("layout", layout); result.put("density", density); result.put("focusAgent", focus);
+    result.put("viewMode", viewMode); result.put("dockHiddenAgents", dockHidden); result.put("dockSize", dockSize); return result;
   }
 
   private static List<String> stringList(Object value, String field) {
