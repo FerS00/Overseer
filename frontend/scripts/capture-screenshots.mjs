@@ -22,6 +22,8 @@ const events = [
   event('claude', 'tool_use', 'Edita ResumenCarrito.ts', 'src/carrito/ResumenCarrito.ts\n\nexport function calcularSubtotal(items: Item[]): number {\n  return items.reduce((total, item) => total + item.precio * item.cantidad, 0);\n}', 10, 'Edit'),
   event('codex', 'tool_result', 'Revisión de pruebas completada', 'Los casos de carrito están listos para ejecutarse.', 11, 'Read'),
   event('codex', 'tool_use', 'Ejecuta las pruebas del carrito', 'npm test -- carrito', 12, 'exec'),
+  event('antigravity', 'tool_use', 'Llamando a view_file', 'src/carrito/ResumenCarrito.ts', 10, 'view_file'),
+  event('deepseek', 'tool_use', 'Llamando a shell', 'npx ng build --configuration production', 11, 'shell'),
 ].map((item) => ({ ...item, ts: new Date(fixedNow - (12 - item.seq) * 18_000).toISOString() }))
   .map((item, index) => ({ ...item, id: index + 1 }));
 
@@ -30,19 +32,20 @@ function event(agent, type, title, detail, seq, tool = '') {
     uid: `screenshot-${agent}-${seq}`, agent,
     session_id: `${agent}-demo-session`, parent_session_id: null,
     source: agent === 'codex' && seq > 2 ? 'rollout' : 'hook', type, status: null,
-    title, detail, tool, meta: { cwd: '/work/tienda-demo', model: agent === 'claude' ? 'Sonnet' : 'Codex' }, seq,
+    title, detail, tool, meta: { cwd: '/work/tienda-demo', model: { claude: 'Sonnet', codex: 'Codex', antigravity: 'Gemini', deepseek: 'DeepSeek' }[agent] }, seq,
   };
 }
 
 function sessions() {
-  return ['claude', 'codex'].map((agent) => ({
-    id: `${agent}-demo-session`, agent, cwd: '/work/tienda-demo', model: agent === 'claude' ? 'Sonnet' : 'Codex',
+  const last = { claude: 'Edita ResumenCarrito.ts', codex: 'Ejecuta las pruebas del carrito', antigravity: 'Llamando a view_file', deepseek: 'Llamando a shell' };
+  return Object.keys(last).map((agent) => ({
+    id: `${agent}-demo-session`, agent, cwd: '/work/tienda-demo', model: { claude: 'Sonnet', codex: 'Codex', antigravity: 'Gemini', deepseek: 'DeepSeek' }[agent],
     started_at: new Date(fixedNow - 600_000).toISOString(), last_event_at: new Date(fixedNow - 18_000).toISOString(),
-    last_action: agent === 'claude' ? 'Edita ResumenCarrito.ts' : 'Ejecuta las pruebas del carrito', state: 'active', parent_session_id: null,
+    last_action: last[agent], state: 'active', parent_session_id: null,
   }));
 }
 
-async function installMocks(page, data) {
+async function installMocks(page, data, preferences = {}) {
   await page.addInitScript(() => {
     class OpenEventSource extends EventTarget {
       static CONNECTING = 0;
@@ -80,7 +83,7 @@ async function installMocks(page, data) {
       { id: 'antigravity', name: 'Antigravity', mascot: 'astro', color: '#F28BC8', detected: true },
       { id: 'deepseek', name: 'DeepSeek Harness', mascot: 'hondo', color: '#5CC8F5', detected: true },
     ];
-    else if (url.pathname.endsWith('/api/preferences')) body = { agentOrder: ['claude', 'codex', 'antigravity', 'deepseek'], hiddenAgents: [], layout: 'automatic', density: 'normal', focusAgent: 'claude' };
+    else if (url.pathname.endsWith('/api/preferences')) body = { agentOrder: ['claude', 'codex', 'antigravity', 'deepseek'], hiddenAgents: [], layout: 'automatic', density: 'normal', focusAgent: 'claude', viewMode: 'cabins', dockHiddenAgents: [], dockSize: 'normal', ...preferences };
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   });
 }
@@ -93,6 +96,17 @@ async function openView(browser, { width = 1440, height = 900, data = events, qu
   await expect(page.locator('.connection')).toHaveText('En vivo');
   if (data.length) await page.locator('.timeline-row').first().waitFor();
   await page.waitForTimeout(180);
+  return page;
+}
+
+async function openDock(browser, { width = 1280, height = 720 } = {}) {
+  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: width < 500 ? 2 : 1 });
+  await installMocks(page, events, { viewMode: 'dock' });
+  await page.goto(`${baseURL}/`, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.dock .slot')).toHaveCount(4);
+  await expect(page.locator('#dock-slot-codex')).toHaveAttribute('aria-label', /ejecutando pruebas/);
+  await page.mouse.move(width / 2, 0);
+  await page.waitForTimeout(400);
   return page;
 }
 
@@ -131,7 +145,7 @@ async function captureGrid(browser, agent, sourcePage) {
 }
 
 await fs.mkdir(outputDir, { recursive: true });
-const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH, headless: true } : { channel: 'chrome', headless: true });
 try {
   const overview = await openView(browser);
   await waitForFinalCabinStates(overview);
@@ -165,6 +179,27 @@ try {
   await empty.getByRole('heading', { name: 'Conecta tus agentes' }).waitFor();
   await empty.screenshot({ path: path.join(outputDir, 'empty-state-v4c.png'), fullPage: true });
   await empty.close();
+
+  const dock = await openDock(browser);
+  await dock.screenshot({ path: path.join(outputDir, 'dock-v5.png'), clip: { x: 0, y: 0, width: 1280, height: 130 } });
+  await dock.locator('#dock-slot-codex').click();
+  await dock.getByRole('dialog', { name: 'Codex' }).waitFor();
+  await dock.waitForTimeout(300);
+  await dock.screenshot({ path: path.join(outputDir, 'dock-flyout-v5.png') });
+  await dock.keyboard.press('Escape');
+  await dock.getByRole('button', { name: 'Ajustes de vista' }).click();
+  await dock.getByRole('dialog', { name: 'Ajustes de vista' }).waitFor();
+  await dock.waitForTimeout(300);
+  await dock.setViewportSize({ width: 1280, height: 860 });
+  await dock.screenshot({ path: path.join(outputDir, 'dock-settings-v5.png') });
+  await dock.close();
+
+  const dockMobile = await openDock(browser, { width: 390, height: 760 });
+  await dockMobile.locator('#dock-slot-deepseek').click();
+  await dockMobile.getByRole('dialog', { name: 'DeepSeek Harness' }).waitFor();
+  await dockMobile.waitForTimeout(300);
+  await dockMobile.screenshot({ path: path.join(outputDir, 'dock-mobile-v5.png') });
+  await dockMobile.close();
 
   const mascotPage = await openView(browser, { query: '?mascot-demo=1' });
   for (const agent of ['claude', 'codex', 'antigravity', 'deepseek', 'michi']) await captureGrid(browser, agent, mascotPage);
