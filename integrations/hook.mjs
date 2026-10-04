@@ -62,16 +62,25 @@ function convertAntigravity(data, eventName) {
   const input = data.toolCall?.args ?? data.toolInput ?? data.tool_input;
   const output = data.toolResponse ?? data.tool_response ?? data.output;
   let event;
-  if (name === 'PreInvocation') event = { type: 'thinking', source_key: `pre-invocation:${data.invocationId ?? data.invocationNum ?? stable(data)}`, title: 'Preparando respuesta', detail: '', meta: { model: data.modelName } };
+  if (name === 'PreInvocation') {
+    const model = data.modelName ? `${data.modelName}` : '';
+    const step = data.invocationNum != null ? `paso ${data.invocationNum + 1}` : '';
+    const detail = [model, step].filter(Boolean).join(' · ');
+    event = { type: 'thinking', source_key: `pre-invocation:${data.invocationId ?? data.invocationNum ?? stable(data)}`, title: 'Preparando respuesta', detail: trunc(detail), meta: { model: data.modelName } };
+  }
   else if (name === 'PreToolUse') event = { type: 'tool_use', source_key: `${callId || stable(input)}:pre`, tool, title: `Llamando a ${tool || 'herramienta'}`, detail: trunc(inputText(input)), meta: { call_id: callId } };
   else if (name === 'PostToolUse') event = { type: 'tool_result', source_key: `${callId || stable(data)}:post`, tool, status: data.error ? 'error' : 'success', title: data.error ? `${tool || 'Herramienta'} falló` : `${tool || 'Herramienta'} completada`, detail: trunc(data.error || (output == null ? inputText(input) : outputText(output))), meta: { call_id: callId, model: data.modelName } };
-  else if (name === 'PostInvocation') event = { type: 'thinking', source_key: `post-invocation:${data.invocationId ?? data.invocationNum ?? stable(data)}`, title: 'Respuesta generada', detail: '' };
+  else if (name === 'PostInvocation') {
+    const model = data.modelName ? `${data.modelName}` : '';
+    event = { type: 'thinking', source_key: `post-invocation:${data.invocationId ?? data.invocationNum ?? stable(data)}`, title: 'Respuesta generada', detail: trunc(model), meta: { model: data.modelName } };
+  }
   else if (name === 'Stop') {
     const failed = !!data.error || /error|fail/i.test(String(data.terminationReason || ''));
+    const stopReason = data.terminationReason === 'model_stop' ? 'Turno completado' : (data.terminationReason && data.terminationReason !== 'NO_TOOL_CALL' ? data.terminationReason : '');
     event = { type: failed ? 'error' : data.fullyIdle === false ? 'thinking' : 'turn_end',
       source_key: `stop:${data.executionNum ?? data.invocationId ?? stable(data)}`,
       title: failed ? 'Turno fallido' : data.fullyIdle === false ? 'Esperando tareas en segundo plano' : 'Turno finalizado',
-      detail: trunc(data.error || data.lastAssistantMessage || ''), meta: { termination_reason: trunc(data.terminationReason || '') } };
+      detail: trunc(data.error || data.lastAssistantMessage || stopReason), meta: { termination_reason: trunc(data.terminationReason || '') } };
   }
   else return null;
   return { ...event, agent: 'antigravity', source: 'hook', session_id: session || null,

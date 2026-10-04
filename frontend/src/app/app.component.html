@@ -69,7 +69,7 @@
               <span class="section-label">Ahora</span>
               <strong>{{ stateFor(agent.id).title }}</strong>
               @if (stateFor(agent.id).detail) { <code>{{ stateFor(agent.id).detail }}</code> }
-              @else { <span class="quiet">Sin actividad reciente</span> }
+              @else if (!stateFor(agent.id).lastTs) { <span class="quiet">Sin actividad reciente</span> }
             </section>
           </div>
           <div class="agent-metrics" aria-label="Métricas del agente">
