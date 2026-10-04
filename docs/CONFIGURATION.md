@@ -107,6 +107,10 @@ Use the cabin checkboxes to select two or more agents, then choose **Ocultar N s
 
 Drag the dotted handle onto another cabin to reorder. On touch screens or with a keyboard, open **Opciones de [agente]** and use **Mover antes / Mover después**. The same menu offers focus, automatic grid, horizontal row, and compact/normal density. Hiding the focused cabin returns to the automatic grid. The view is saved through `/api/preferences`; writes run sequentially and an HTTP error produces a visible message while retaining the local cache.
 
+## Dock view and view settings
+
+**Ajustes de vista** is a dialog available from the top bar and from the dock. **Vista** switches between the cabins and the dock; **Agentes y orden** has a switch per mascot that only affects the dock (agents that are not detected stay dimmed and cannot be enabled), plus a drag handle and **Subir / Bajar** buttons that change the order shared by both views; **Tamaño del dock** chooses normal or compact slots; **Modo calma** is the same setting as the top-bar button. Every change is saved immediately through `/api/preferences`; when the server cannot save, the dialog says so and the browser copy is kept.
+
 ### Antigravity event routing
 
 Update older installations with `node integrations/wire-up.mjs --agents antigravity --apply`. The generated commands end in an explicit event name, for example `hook.mjs antigravity PostToolUse`. The documented stdin payload does not contain an event discriminator, so the command supplies it. Invocation, step, and execution numbers keep repeated actions distinct. Post-tool records include the command or file path when the client sends no tool output. Overseer observes completed tools without registering a permission-gating PreToolUse hook.
