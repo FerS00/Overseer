@@ -126,7 +126,7 @@ async function captureGrid(browser, agent, sourcePage) {
     img{display:block;width:100%;height:166px;object-fit:contain}figcaption{margin-top:8px;color:#aeb9d5}
   </style></head><body><h1>${meta[1][0].toUpperCase() + meta[1].slice(1)} · ${meta[0]}</h1><div class="grid">${images.map(({ state, src }) => `<figure><img alt="${state}" src="${src}"><figcaption>${state}</figcaption></figure>`).join('')}</div></body></html>`);
   await grid.locator('.grid img').last().waitFor();
-  await grid.screenshot({ path: path.join(outputDir, agent === 'michi' ? 'michi.png' : `mascots-${meta[1]}.png`) });
+  await grid.screenshot({ path: path.join(outputDir, agent === 'michi' ? 'michi-v4c.png' : `mascots-${meta[1]}-v4c.png`) });
   await grid.close();
 }
 
@@ -135,17 +135,17 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true });
 try {
   const overview = await openView(browser);
   await waitForFinalCabinStates(overview);
-  await overview.screenshot({ path: path.join(outputDir, 'overview.png'), fullPage: true });
+  await overview.screenshot({ path: path.join(outputDir, 'overview-v4c.png'), fullPage: true });
   await overview.getByLabel('Opciones de DeepSeek Harness', { exact: true }).click();
   await overview.getByRole('button', { name: 'Ocultar DeepSeek Harness', exact: true }).click();
   await expect(overview.locator('.cabin:visible')).toHaveCount(3);
-  await overview.screenshot({ path: path.join(outputDir, 'layout-three.png'), fullPage: true });
+  await overview.screenshot({ path: path.join(outputDir, 'layout-three-v4c.png'), fullPage: true });
   await overview.getByLabel('Opciones de Antigravity', { exact: true }).click();
   await overview.getByRole('button', { name: 'Ocultar Antigravity', exact: true }).click();
   await overview.getByLabel('Opciones de Codex', { exact: true }).click();
   await overview.getByRole('button', { name: 'Ocultar Codex', exact: true }).click();
   await expect(overview.locator('.cabin:visible')).toHaveCount(1);
-  await overview.screenshot({ path: path.join(outputDir, 'layout-one.png'), fullPage: true });
+  await overview.screenshot({ path: path.join(outputDir, 'layout-one-v4c.png'), fullPage: true });
   await overview.getByRole('button', { name: 'Mostrar todos', exact: true }).click();
   await overview.evaluate(() => window.scrollTo(0, 0));
   const viewport = overview.locator('.event-viewport');
@@ -153,17 +153,17 @@ try {
   await overview.locator('.timeline-row').filter({ hasText: 'Edita ResumenCarrito.ts' }).click();
   await overview.getByRole('dialog').waitFor();
   await overview.evaluate(() => window.scrollTo(0, 0));
-  await overview.screenshot({ path: path.join(outputDir, 'timeline-detail.png') });
+  await overview.screenshot({ path: path.join(outputDir, 'timeline-detail-v4c.png') });
   await overview.close();
 
   const mobile = await openView(browser, { width: 390, height: 844 });
   await waitForFinalCabinStates(mobile);
-  await mobile.screenshot({ path: path.join(outputDir, 'mobile.png') });
+  await mobile.screenshot({ path: path.join(outputDir, 'mobile-v4c.png') });
   await mobile.close();
 
   const empty = await openView(browser, { data: [] });
   await empty.getByRole('heading', { name: 'Conecta tus agentes' }).waitFor();
-  await empty.screenshot({ path: path.join(outputDir, 'empty-state.png'), fullPage: true });
+  await empty.screenshot({ path: path.join(outputDir, 'empty-state-v4c.png'), fullPage: true });
   await empty.close();
 
   const mascotPage = await openView(browser, { query: '?mascot-demo=1' });

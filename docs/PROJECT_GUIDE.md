@@ -131,4 +131,4 @@ npm run e2e
 cd ..; node --test integrations/
 ```
 
-For reproducible synthetic UI screenshots, start the Angular development server and run `npm run screenshots` from `frontend`. The script writes PNGs to `docs/images/`; set `BASE_URL` to use another already-running development server.
+For reproducible synthetic UI screenshots, start the Angular development server and run `npm run screenshots` from `frontend`. The script writes prototype revision 4c PNGs (`*-v4c.png`) to `docs/images/`; README links use these names so old image URLs are not reused; set `BASE_URL` to use another already-running development server.

@@ -28,7 +28,7 @@ Estado de verificación: **Aprobado con observaciones** (2026-10-03). Cambios de
 
 Una sesión real de Antigravity CLI generó view_file/run_command y fin de turno; se recuperaron 95 eventos de esa sesión después de reconstruir el contenedor. La auditoría final `800237c739ee4560a6b2d70bc9fa9d5d` volvió a ejecutar las cinco comprobaciones y terminó APROBADO, sin denegaciones, omisiones ni modificaciones de fuentes (34 llamadas de control). Su Stop real llegó como «Turno finalizado» con `meta.termination_reason=NO_TOOL_CALL`. La primera auditoría de posiciones encontró una lectura tardía en el test de animación; se corrigió capturando la animación real durante el clic, conservando todas sus comprobaciones.
 
-Capturas regeneradas: [una cabina centrada](images/layout-one.png) y [tres cabinas](images/layout-three.png). Imagen Docker `sha256:4682601eb7d2bf00e5d4a83d4819733eb2bca6bbb6b5f900b1da7ccbfe57e0d6`, saludable en `127.0.0.1:8787`, volumen H2 conservado.
+Capturas regeneradas: [una cabina centrada](images/layout-one-v4c.png) y [tres cabinas](images/layout-three-v4c.png). Imagen Docker `sha256:4682601eb7d2bf00e5d4a83d4819733eb2bca6bbb6b5f900b1da7ccbfe57e0d6`, saludable en `127.0.0.1:8787`, volumen H2 conservado.
 
 Esto no acredita las rutas IDE/2.0 ni sesiones reales de Claude/DeepSeek. OSV-Scanner no disponible: revisión de vulnerabilidades de dependencias no ejecutada. Graphify se actualizó en code-only, sin extracción semántica de documentos/imágenes.
 
@@ -41,3 +41,5 @@ Support four-agent monitoring and interactive cabin customization
 ```
 
 Incluir fuentes, pruebas, migración V5, documentación, referencia de diseño y PNG del repositorio. El diseño aportado por el usuario se conserva y se incluye como referencia, sin atribución automática. `.env`, datos, credenciales, configuraciones globales, informes temporales, grafo y checkpoint/plan locales permanecen fuera del staging según la política del repositorio. El usuario autorizó commit y push normal a `origin/main` el 2026-10-03; el hash y la publicación se comprueban en el historial Git y en el remoto.
+
+Corrección de imágenes del README: las once capturas se regeneraron desde la aplicación local con el diseño 4c y se publican con nombres `*-v4c.png`. Se sustituyen las URLs reutilizadas del diseño anterior, preservando los encabezados y subsecciones. Las capturas usan datos de ejemplo aislados; no modifican preferencias reales. La caché como origen de la visualización antigua no pudo confirmarse.

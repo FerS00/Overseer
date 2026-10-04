@@ -12,7 +12,7 @@
 ![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)
 ![Status](https://img.shields.io/badge/status-MVP%20·%20local%20monitor-orange?style=flat-square)
 
-![Overseer](docs/images/overview.png)
+![Overseer](docs/images/overview-v4c.png)
 
 ---
 
@@ -23,39 +23,39 @@
 
 ### Mascots
 #### Michi
-<img src="docs/images/michi.png" alt="Michi in nine states" width="100%">
+<img src="docs/images/michi-v4c.png" alt="Michi in nine states" width="100%">
 
 Michi is the user's pixel cat, with one collar light per detected agent.
 
 #### Claude Code · Chispa
-<img src="docs/images/mascots-chispa.png" alt="Chispa in nine states" width="100%">
+<img src="docs/images/mascots-chispa-v4c.png" alt="Chispa in nine states" width="100%">
 
 Chispa is the pixel character for Claude Code. Its drawings and animation follow the approved prototype.
 
 #### Codex · Nodo
-<img src="docs/images/mascots-nodo.png" alt="Nodo in nine states" width="100%">
+<img src="docs/images/mascots-nodo-v4c.png" alt="Nodo in nine states" width="100%">
 
 Nodo is the purple character for Codex, with a white prompt on its face.
 
 #### Antigravity · Astro
-<img src="docs/images/mascots-astro.png" alt="Astro in nine states" width="100%">
+<img src="docs/images/mascots-astro-v4c.png" alt="Astro in nine states" width="100%">
 
 Astro is the pink orbital character for Antigravity.
 
 #### DeepSeek Harness · Hondo
-<img src="docs/images/mascots-hondo.png" alt="Hondo in nine states" width="100%">
+<img src="docs/images/mascots-hondo-v4c.png" alt="Hondo in nine states" width="100%">
 
 Hondo is the blue character for DeepSeek Harness. Each agent mascot shows idle, thinking, reading, editing, running, permission, done, error, and sleeping states.
 
-![Timeline event detail](docs/images/timeline-detail.png)
+![Timeline event detail](docs/images/timeline-detail-v4c.png)
 
-![Three visible cabins](docs/images/layout-three.png)
+![Three visible cabins](docs/images/layout-three-v4c.png)
 
-![One centered cabin](docs/images/layout-one.png)
+![One centered cabin](docs/images/layout-one-v4c.png)
 
-![Mobile layout](docs/images/mobile.png)
+![Mobile layout](docs/images/mobile-v4c.png)
 
-![Empty state and setup commands](docs/images/empty-state.png)
+![Empty state and setup commands](docs/images/empty-state-v4c.png)
 
 ---
 
