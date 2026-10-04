@@ -43,6 +43,14 @@ export class PreferencesService {
   readonly error = signal('');
   private queue: Promise<void> = Promise.resolve();
 
+  constructor() {
+    // Start from the browser copy so dock mode does not flash the cabins while the server answers.
+    try {
+      const cached = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+      if (cached && Array.isArray(cached.agentOrder)) this.preferences.set(normalizePreferences(cached));
+    } catch { /* preferencias locales opcionales */ }
+  }
+
   async load(): Promise<void> {
     let stored: Partial<ViewPreferences> | null = null;
     try { const response = await fetch('/api/preferences'); stored = response.ok ? await response.json() : null; } catch { stored = null; }

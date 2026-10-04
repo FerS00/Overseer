@@ -10,9 +10,10 @@ import { AstroComponent, ChispaComponent, HondoComponent, MichiComponent, NodoCo
 import { MascotEngine } from './mascots/mascot-engine.service';
 import { compareEventRecency, MascotState, MASCOT_STATES, MASCOT_STATE_LABELS } from './mascots/mascot-state';
 import { MascotHandoff, MascotStateService } from './mascots/mascot-state.service';
-import { PreferencesService } from './preferences.service';
+import { PreferencesService, ViewPreferences } from './preferences.service';
+import { DockBarComponent } from './dock/dock-bar.component';
 import { ActivityBadgeComponent } from './dock/activity-badge.component';
-import { activityLabel } from './dock/dock.models';
+import { DockAgent, activityLabel } from './dock/dock.models';
 const EVENT_TYPES = ['session_start', 'user_prompt', 'thinking', 'message', 'tool_use', 'tool_result', 'handoff', 'turn_end', 'session_end', 'error', 'permission_request', 'note'] as const;
 const TYPE_LABELS: Record<string, string> = {
   session_start: 'Inicio de sesión', user_prompt: 'Prompt', thinking: 'Pensando', message: 'Mensaje', tool_use: 'Herramienta',
@@ -26,7 +27,7 @@ const OVERSCAN = 8;
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [MichiComponent, ChispaComponent, NodoComponent, AstroComponent, HondoComponent, JsonPipe, ActivityBadgeComponent],
+  imports: [MichiComponent, ChispaComponent, NodoComponent, AstroComponent, HondoComponent, JsonPipe, DockBarComponent, ActivityBadgeComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app.component.html',
   host: { '[class.calm-mode]': 'mascotEngine.calm()' },
@@ -85,6 +86,29 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly michi = computed(() => this.michiState());
   readonly michiIndicators = computed(() => this.visibleProfiles().map((profile) => ({ id: profile.id, color: profile.color, state: this.mascotStateFor(profile.id) })));
   readonly sessionsByAgent = computed(() => Object.fromEntries(this.agentIds.map((id) => [id, this.sessions().filter((session) => session.agent === id).sort((a, b) => this.compareSessions(b, a))])) as Record<string, AgentSession[]>);
+  /** Opening the timeline from the dock shows the cabins without changing the saved view. */
+  readonly viewOverride = signal<'cabins' | null>(null);
+  readonly view = computed(() => this.viewOverride() ?? this.preferences().viewMode);
+  readonly dockProfiles = computed(() => this.preferences().agentOrder.map((id) => this.profiles().find((p) => p.id === id))
+    .filter((p): p is AgentMeta => !!p && p.detected !== false && !this.preferences().dockHiddenAgents.includes(p.id)));
+  readonly dockAgents = computed<DockAgent[]>(() => {
+    const snapshots = this.mascotState.snapshots();
+    const events = this.events();
+    return this.dockProfiles().map((profile) => {
+      const snapshot = snapshots[profile.id];
+      const state = this.mascotStateFor(profile.id);
+      const demo = this.mascotDemo;
+      const session = snapshot?.sessionId ? this.sessions().find((item) => item.id === snapshot.sessionId) : undefined;
+      const recent: AgentEvent[] = [];
+      for (let index = events.length - 1; index >= 0 && recent.length < 12; index--) if (events[index].agent === profile.id) recent.push(events[index]);
+      return {
+        ...snapshot, state, activity: demo ? null : snapshot.activity, target: demo ? null : snapshot.target,
+        id: profile.id, name: profile.name, mascot: profile.mascot, color: profile.color,
+        sessionStartedAt: session && Number.isFinite(Date.parse(session.started_at)) ? Date.parse(session.started_at) : null,
+        recent, tools: this.totalFor(profile.id, 'tools'), events: this.totalFor(profile.id, 'events'),
+      };
+    });
+  });
   private readonly viewport = viewChild<ElementRef<HTMLElement>>('eventViewport');
   private readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
   private readonly detailPanel = viewChild<ElementRef<HTMLElement>>('detailPanel');
@@ -348,6 +372,7 @@ export class AppComponent implements OnInit, OnDestroy {
       else if (!event.shiftKey && (document.activeElement === last || !activeDialog.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
       return;
     }
+    if (target?.closest?.('dialog[open], .dock-wrap, app-agent-flyout')) return;
     const typing = !!target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
     if (event.key === 'Escape') { if (this.selected()) this.closeDetail(); else if (this.helpOpen()) this.toggleHelp(); return; }
     if (typing || event.altKey || event.ctrlKey || event.metaKey) return;
@@ -437,6 +462,18 @@ export class AppComponent implements OnInit, OnDestroy {
     this.preferences.update((value) => ({ ...value, [key]: (event.target as HTMLSelectElement).value })); await this.savePreferences();
   }
   async updateFocus(event: Event): Promise<void> { this.preferences.update((value) => ({ ...value, focusAgent: (event.target as HTMLSelectElement).value })); await this.savePreferences(); }
+  /** The view settings dialog arrives in the next change; until then the dock offers a way back to the cabins. */
+  openSettings(): void { void this.applyPreferences({ viewMode: 'cabins' }); }
+  async applyPreferences(patch: Partial<ViewPreferences>): Promise<void> {
+    if (patch.viewMode) this.viewOverride.set(null);
+    await this.prefs.update(patch);
+  }
+  openTimelineFor(agent: string): void {
+    this.viewOverride.set('cabins');
+    this.agentFilter.set(agent); this.sessionFilter.set('all');
+    requestAnimationFrame(() => document.getElementById('timeline-title')?.scrollIntoView({ block: 'start' }));
+  }
+  backToDock(): void { this.viewOverride.set(null); }
   activityFor(agent: string): string {
     if (this.mascotDemo) return '';
     const snapshot = this.mascotState.snapshots()[agent];
