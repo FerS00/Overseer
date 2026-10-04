@@ -1,0 +1,1208 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overseer Dock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Prototipo de escritorio (revisión 5, propuesta): dock superior con las mascotas de los agentes visibles,
+   flyout por agente, subestados de actividad y panel de ajustes. Las mascotas y sus nueve estados se copian
+   sin cambios de prototype-v4.html (4c); todo lo nuevo es una capa encima. Diseño solo oscuro. */
+:root {
+  color-scheme: dark;
+  --bg: #0A0D14; --bg-glow: #121733; --surface: #11151F; --surface-2: #171C29; --stage: #0D1119;
+  --line: #222A3B; --line-strong: #6E7A96;
+  --fg: #E8ECF4; --muted: #98A2B8;
+  --brand: #A99BFF; --on-brand: #0A0D14; --ring: #C9C2FF;
+  --claude: #EE8B66; --codex: #8FA2FF; --antigravity: #F28BC8; --deepseek: #5CC8F5;
+  --ok: #4ADE80; --warn: #FBBF24; --bad: #F87171;
+  --dock-bg: rgba(17, 21, 31, .88);
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+  --r-md: 14px; --r-lg: 22px;
+  --slot: 60px; --pet: 40px;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body { margin: 0; background: radial-gradient(900px 420px at 15% -10%, var(--bg-glow), transparent 70%), var(--bg); color: var(--fg); font: 400 16px/1.5 var(--font-body); min-height: 100vh; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+p { margin: 0; }
+button { font: inherit; cursor: pointer; color: inherit; }
+:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; border-radius: 6px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.mono { font-family: var(--font-mono); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px 64px; display: grid; gap: 22px; }
+body[data-view="dock"] .wrap { padding-top: 132px; }
+
+/* ---------- controles compartidos (de v4) ---------- */
+.btn { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 999px;
+  border: 1px solid var(--line-strong); background: transparent; font-size: .9rem; font-weight: 500; white-space: nowrap; }
+.btn:hover { background: var(--surface-2); }
+.btn[aria-pressed="true"], .btn.primary { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
+.btn.primary:hover { background: #BCB1FF; }
+.btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tag { display: inline-flex; align-items: center; gap: 8px; font: 600 .75rem var(--font-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.tag::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line-strong); border-radius: 22px; padding: 3px; gap: 2px; background: var(--stage); }
+.seg button { min-height: 38px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; font-size: .88rem; }
+.seg button:hover { background: var(--surface-2); }
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.icon-btn { width: 44px; height: 44px; flex: none; display: grid; place-items: center; border-radius: 999px; border: 1px solid transparent; background: transparent; color: var(--muted); }
+.icon-btn:hover { background: var(--surface-2); color: var(--fg); border-color: var(--line); }
+.icon-btn:disabled { opacity: .3; cursor: default; background: transparent; }
+.icon-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--surface-2); font: 600 .78rem var(--font-mono); letter-spacing: .04em; white-space: nowrap; }
+.pill i { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.pill[data-s="thinking"] i { background: var(--brand); }
+.pill[data-s="reading"] i, .pill[data-s="editing"] i, .pill[data-s="running"] i, .pill[data-s="done"] i { background: var(--ok); }
+.pill[data-s="permission"] i { background: var(--warn); animation: pulse 1s ease-in-out infinite; }
+.pill[data-s="error"] i { background: var(--bad); }
+.group-label { font: 600 .72rem var(--font-mono); text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 20px; }
+
+/* ---------- cabecera de la página ---------- */
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+.top h1 { font-size: clamp(1.6rem, 3vw, 2.3rem); font-weight: 800; letter-spacing: -.01em; }
+.top p { color: var(--muted); max-width: 62ch; margin-top: 4px; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+
+/* ---------- dock ---------- */
+.dock-wrap { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 40; max-width: calc(100vw - 32px); }
+body[data-view="cabins"] .dock-wrap { display: none; }
+.dock { display: flex; align-items: center; gap: 4px; padding: 6px 6px 6px 10px; border-radius: 24px;
+  background: var(--dock-bg); border: 1px solid var(--line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+.dock[data-size="compact"] { --slot: 50px; --pet: 30px; border-radius: 20px; }
+.dock-empty { padding: 0 10px; color: var(--muted); font-size: .85rem; max-width: 26ch; line-height: 1.3; }
+.dock-sep { width: 1px; align-self: stretch; margin: 8px 4px; background: var(--line); }
+.slot { position: relative; width: var(--slot); padding: 4px 0 3px; display: grid; justify-items: center; gap: 2px;
+  border: 1px solid transparent; border-radius: 16px; background: transparent; transition: background .15s, border-color .15s, transform .2s cubic-bezier(.3,1.5,.5,1); }
+.slot:hover { background: var(--surface-2); }
+.slot[aria-expanded="true"] { background: var(--surface-2); border-color: color-mix(in srgb, var(--accent) 55%, transparent); transform: translateY(2px) scale(1.06); }
+.slot .orbit { position: relative; width: calc(var(--pet) + 12px); height: calc(var(--pet) + 12px); display: grid; place-items: center; }
+.slot .tring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.slot .tring circle { fill: none; stroke-width: 2.5; }
+.slot .tring .track { stroke: var(--line); }
+.slot .tring .fill { stroke: var(--accent); stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; transition: stroke-dashoffset .25s linear; }
+.slot[data-state="permission"] .tring .fill, .slot[data-state="permission"] .tring .track { stroke: var(--warn); }
+.slot[data-state="error"] .tring .fill, .slot[data-state="error"] .tring .track { stroke: var(--bad); }
+.slot[data-state="permission"] .tring, .slot[data-state="error"] .tring { animation: pulse 1s ease-in-out infinite; }
+.slot[data-state="idle"] .tring .fill, .slot[data-state="sleeping"] .tring .fill { opacity: 0; }
+.slot .pet { width: var(--pet); height: var(--pet); }
+.slot .badge { position: absolute; right: -4px; top: -3px; width: 20px; height: 20px; padding: 1px; border-radius: 7px; background: var(--stage); border: 1px solid var(--line); color: var(--accent); }
+.dock[data-size="compact"] .slot .badge { width: 17px; height: 17px; right: -3px; top: -2px; }
+.slot .badge:empty { display: none; }
+.slot-label { display: inline-flex; align-items: center; gap: 4px; font: 600 .62rem/1 var(--font-mono); letter-spacing: .06em; color: var(--muted); white-space: nowrap; }
+.dock[data-size="compact"] .slot-label { font-size: .56rem; }
+.slot-label i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex: none; }
+.slot[data-state="thinking"] .slot-label i { background: var(--brand); }
+.slot[data-state="reading"] .slot-label i, .slot[data-state="editing"] .slot-label i, .slot[data-state="running"] .slot-label i, .slot[data-state="done"] .slot-label i { background: var(--ok); }
+.slot[data-state="permission"] .slot-label { color: var(--warn); } .slot[data-state="permission"] .slot-label i { background: var(--warn); }
+.slot[data-state="error"] .slot-label { color: var(--bad); } .slot[data-state="error"] .slot-label i { background: var(--bad); }
+.tip { position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); padding: 4px 10px; border-radius: 8px; background: var(--fg); color: var(--bg);
+  font: 600 .75rem var(--font-body); white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .15s .4s; }
+.slot:hover .tip, .slot:focus-visible .tip { opacity: 1; }
+.slot[aria-expanded="true"] .tip, .flyout-open .slot .tip { display: none; }
+.dock-gear { color: var(--muted); }
+
+/* ---------- flyout ---------- */
+.flyout { position: fixed; z-index: 45; width: min(368px, calc(100vw - 32px)); background: var(--surface); border: 1px solid var(--line-strong);
+  border-radius: 20px; box-shadow: 0 18px 40px rgba(0,0,0,.55); padding: 16px; display: grid; gap: 14px; animation: fly-in .2s ease-out; }
+.flyout[hidden] { display: none; }
+.flyout::before { content: ""; position: absolute; top: -7px; left: var(--caret, 50%); width: 12px; height: 12px; margin-left: -6px; transform: rotate(45deg);
+  background: var(--surface); border-left: 1px solid var(--line-strong); border-top: 1px solid var(--line-strong); }
+@keyframes fly-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.fly-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.fly-head h2 { font-size: 1.15rem; color: var(--accent); }
+.fly-head .sub { font: 400 .75rem var(--font-mono); color: var(--muted); }
+.fly-now { display: grid; gap: 8px; padding: 12px; border-radius: var(--r-md); background: var(--stage); border: 1px solid var(--line); }
+.fly-act { display: flex; align-items: center; gap: 10px; }
+.fly-act .badge-lg { width: 32px; height: 32px; flex: none; padding: 4px; border-radius: 10px; background: var(--surface-2); color: var(--accent); }
+.fly-act .badge-lg:empty { display: none; }
+.fly-act b { display: block; font-weight: 600; }
+.fly-act .tool { font: 400 .78rem var(--font-mono); color: var(--muted); }
+.target { display: grid; gap: 3px; min-width: 0; }
+.target .kind { font: 600 .65rem var(--font-mono); letter-spacing: .1em; color: var(--muted); }
+.target code { font: 400 .82rem var(--font-mono); color: var(--fg); overflow-wrap: anywhere; }
+.times { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.times div { min-width: 0; }
+.times dt { font: 600 .65rem var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.times dd { margin: 0; font: 600 .9rem var(--font-mono); font-variant-numeric: tabular-nums; }
+.recent { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.recent li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; font-size: .84rem; }
+.recent time { font: 400 .75rem var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 1px; }
+.recent span { overflow-wrap: anywhere; }
+.fly-foot { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.events { border-top: 1px solid var(--line); padding-top: 12px; max-height: 220px; overflow: auto; }
+.events[hidden] { display: none; }
+
+/* ---------- mascota envuelta: movimiento por subestado y variaciones ---------- */
+.pet { display: block; }
+.pet-var, .pet-body { display: block; width: 100%; height: 100%; transform-origin: 50% 90%; }
+.pet svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.pet[data-activity="read.batch"] .pet-body { animation: pm-scan .7s ease-in-out infinite; }
+.pet[data-activity="read.tree"] .pet-body { animation: pm-nod 1.2s steps(3) infinite; }
+.pet[data-activity="read.web"] .pet-body { animation: pm-gaze-up 2.4s ease-in-out infinite; }
+.pet[data-activity="edit.multi"] .pet-body { animation: pm-side 1s steps(2) infinite; }
+.pet[data-activity="run.test"] .pet-body { animation: pm-tick 1.2s ease-out infinite; }
+.pet[data-activity="run.build"] .pet-body { animation: pm-thump .8s ease-in-out infinite; }
+.pet[data-activity="run.install"] .pet-body { animation: pm-sink 1.6s ease-in-out infinite; }
+.pet[data-activity="run.net"] .pet-body { animation: pm-pulse 1.4s ease-in-out infinite; }
+.pet[data-activity="run.wait"] .pet-body { animation: pm-sway 3.2s ease-in-out infinite; }
+.pet[data-activity="run.wait"] svg * { animation-play-state: paused; }
+.pet[data-family="px"] .pet-body { animation-timing-function: steps(2) !important; }
+@keyframes pm-scan { 25% { transform: translateX(-4%); } 75% { transform: translateX(4%); } }
+@keyframes pm-nod { 50% { transform: translateY(4%); } }
+@keyframes pm-gaze-up { 50% { transform: rotate(-4deg) translateY(-3%); } }
+@keyframes pm-side { 50% { transform: translateX(6%); } }
+@keyframes pm-tick { 0%, 70%, 100% { transform: translateY(0); } 82% { transform: translateY(-7%); } }
+@keyframes pm-thump { 0%, 100% { transform: scale(1, 1); } 40% { transform: scale(1.05, .94); } }
+@keyframes pm-sink { 50% { transform: translateY(4%); } }
+@keyframes pm-pulse { 50% { transform: scale(1.04); } }
+@keyframes pm-sway { 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
+
+/* ---------- insignias de subestado (20×20, color del agente en currentColor) ---------- */
+.badge svg, .badge-lg svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.bdg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.bdg .w { stroke: var(--fg); } .bdg .wf { fill: var(--fg); stroke: none; } .bdg .af { fill: currentColor; stroke: none; }
+.bdg * { transform-box: fill-box; transform-origin: center; }
+.b-read-file .lens { animation: bd-scan 1.6s ease-in-out infinite; }
+.b-read-batch .p3 { animation: bd-flip .9s steps(1) infinite; } .b-read-batch .p2 { animation: bd-flip .9s steps(1) infinite .3s; }
+.b-read-tree .n { animation: m-dot 1.5s steps(1) infinite; } .b-read-tree .n2 { animation-delay: .5s; } .b-read-tree .n3 { animation-delay: 1s; }
+.b-read-web .mer { animation: bd-spin-y 2s ease-in-out infinite; }
+.b-edit-file .ln { transform-origin: 0 50%; animation: bd-write 1.2s steps(4) infinite; }
+.b-edit-multi .pen { animation: bd-hop 1s steps(2) infinite; }
+.b-run-shell .cur { animation: nodo-cursor .9s steps(1) infinite; }
+.b-run-test .t { animation: bd-pass 1.8s steps(1) infinite; } .b-run-test .t2 { animation-delay: .6s; } .b-run-test .t3 { animation-delay: 1.2s; }
+.b-run-build .k { animation: bd-stack 1.8s steps(1) infinite; } .b-run-build .k2 { animation-delay: .6s; } .b-run-build .k3 { animation-delay: 1.2s; }
+.b-run-install .arr { animation: bd-drop .9s ease-in infinite; }
+.b-run-net .arc { animation: m-dot 1.2s steps(1) infinite; } .b-run-net .a2 { animation-delay: .4s; } .b-run-net .a3 { animation-delay: .8s; }
+.b-run-wait .glass { animation: bd-turn 2.4s cubic-bezier(.6,0,.3,1) infinite; }
+.b-run-wait .sat { transform-box: view-box; transform-origin: 10px 10px; animation: astro-spin 3.2s linear infinite; }
+@keyframes bd-scan { 50% { transform: translate(2px, 1px); } }
+@keyframes bd-flip { 0% { opacity: 1; } 50% { opacity: .15; } }
+@keyframes bd-spin-y { 50% { transform: scaleX(.15); } }
+@keyframes bd-write { 0% { transform: scaleX(.1); } 100% { transform: scaleX(1); } }
+@keyframes bd-hop { 50% { transform: translateX(-7px); } }
+@keyframes bd-pass { 0% { fill: var(--line-strong); } 50% { fill: var(--ok); } }
+@keyframes bd-stack { 0% { opacity: 1; } 66% { opacity: 0; } }
+@keyframes bd-drop { 0% { transform: translateY(-3px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(2px); opacity: 0; } }
+@keyframes bd-turn { 0%, 40% { transform: rotate(0); } 60%, 100% { transform: rotate(180deg); } }
+
+/* ---------- vista de cabinas (resumen; la especificación completa está en prototype-v4.html) ---------- */
+.cabins { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
+body[data-view="dock"] .cabins-section { display: none; }
+.cabin { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 18px; min-width: 0; }
+.cabin-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.cabin .act { font-weight: 600; }
+.cabin-head h3 { font-size: 1.15rem; color: var(--accent); }
+.cabin-head span { font: 400 .75rem var(--font-mono); color: var(--muted); }
+.cabin-stage { position: relative; display: grid; place-items: center; height: 150px; border-radius: var(--r-md);
+  background: radial-gradient(160px 90px at 50% 70%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%), var(--stage); }
+.cabin-stage .pet { width: 110px; height: 110px; }
+.cabin-stage .badge { position: absolute; right: 12px; top: 12px; width: 30px; height: 30px; padding: 4px; border-radius: 10px; background: var(--surface-2); color: var(--accent); }
+.cabin-stage .badge:empty { display: none; }
+.cabin .meta { display: flex; flex-wrap: wrap; gap: 4px 14px; font: 400 .75rem var(--font-mono); color: var(--muted); }
+
+/* ---------- secciones de revisión ---------- */
+.section-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.section-head h2 { font-size: 1.35rem; }
+.section-head p { color: var(--muted); font-size: .92rem; max-width: 70ch; }
+.desk { display: grid; gap: 10px; place-items: center; text-align: center; min-height: 180px; border: 1px dashed var(--line-strong); border-radius: var(--r-lg); padding: 24px; color: var(--muted); }
+body[data-view="cabins"] .desk { display: none; }
+.desk b { color: var(--fg); }
+.catalog { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 12px; }
+.tile { display: grid; gap: 8px; align-content: start; padding: 14px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); min-width: 0; }
+.tile-stage { position: relative; display: grid; place-items: center; height: 96px; border-radius: 12px; background: var(--stage); }
+.tile-stage .pet { width: 70px; height: 70px; }
+.tile-stage .badge { position: absolute; right: 8px; top: 8px; width: 24px; height: 24px; padding: 2px; border-radius: 8px; background: var(--surface-2); color: var(--accent); }
+.tile b { font-size: .9rem; line-height: 1.25; }
+.tile .code { font: 600 .68rem var(--font-mono); letter-spacing: .06em; color: var(--accent); }
+.tile p { font-size: .78rem; color: var(--muted); line-height: 1.4; }
+.notes { margin: 0; padding-left: 20px; display: grid; gap: 8px; color: var(--muted); font-size: .92rem; }
+.notes b { color: var(--fg); font-weight: 600; }
+
+/* ---------- panel de ajustes ---------- */
+dialog.settings { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; border: 1px solid var(--line-strong); border-radius: var(--r-lg);
+  background: var(--surface); color: var(--fg); box-shadow: 0 24px 60px rgba(0,0,0,.6); }
+dialog.settings::backdrop { background: rgba(5, 7, 12, .6); }
+.settings form { display: grid; gap: 18px; padding: 20px; }
+.set-head { display: flex; align-items: center; gap: 12px; }
+.set-head .michi { width: 52px; height: 52px; flex: none; }
+.set-head div { flex: 1; min-width: 0; }
+.set-head h2 { font-size: 1.3rem; }
+.set-head p { font-size: .82rem; color: var(--muted); }
+.settings fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; }
+.settings legend { padding: 0; margin-bottom: 8px; }
+.agent-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.agent-row { display: grid; grid-template-columns: 32px 40px minmax(0, 1fr) auto auto; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 14px; background: var(--stage); border: 1px solid var(--line); }
+.agent-row.dragging { opacity: .45; } .agent-row.drop-target { border-color: var(--brand); }
+.agent-row[data-detected="false"] { opacity: .5; }
+.agent-row .grip { width: 32px; height: 40px; display: grid; place-items: center; border: 0; background: transparent; color: var(--muted); cursor: grab; border-radius: 8px; }
+.agent-row .grip svg { width: 16px; height: 16px; fill: currentColor; }
+.agent-row .mini { width: 36px; height: 36px; }
+.agent-row .who b { display: block; color: var(--accent); font-size: .95rem; }
+.agent-row .who span { font: 400 .72rem var(--font-mono); color: var(--muted); }
+.agent-row .moves { display: flex; }
+.agent-row .moves .icon-btn { width: 36px; height: 36px; }
+.switch { position: relative; display: inline-flex; align-items: center; min-height: 44px; cursor: pointer; }
+.switch input { position: absolute; z-index: 1; opacity: 0; width: 46px; height: 28px; margin: 0; cursor: pointer; }
+.switch span { width: 46px; height: 28px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line-strong); position: relative; transition: background .15s; }
+.switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--muted); transition: transform .2s cubic-bezier(.3,1.5,.5,1), background .15s; }
+.switch input:checked + span { background: var(--brand); border-color: var(--brand); }
+.switch input:checked + span::after { transform: translateX(18px); background: var(--on-brand); }
+.switch input:focus-visible + span { outline: 3px solid var(--ring); outline-offset: 2px; }
+.switch input:disabled + span { opacity: .4; }
+.hint { font-size: .8rem; color: var(--muted); }
+.set-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid var(--line); padding-top: 14px; }
+.saved { font: 400 .75rem var(--font-mono); color: var(--muted); }
+.saved::before { content: "● "; color: var(--ok); }
+
+/* ---------- mascotas (copiado sin cambios de prototype-v4.html, 4c) ---------- */
+/* ---------- mascotas: base común ---------- */
+.px { shape-rendering: crispEdges; }
+.px .whole { transform-box: fill-box; transform-origin: 50% 100%; }
+.px .prop, .px .fx { display: none; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes slidein { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@keyframes m-dot { 0% { opacity: .25; } 33% { opacity: 1; } 66% { opacity: .25; } }
+@keyframes m-blink { 50% { opacity: .2; } }
+@keyframes m-float { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-3px); opacity: .2; } }
+@keyframes px-bob { 50% { transform: translateY(-1px); } }
+@keyframes px-shake { 50% { transform: translateX(1px); } }
+@keyframes px-hop { 0%,100% { transform: translateY(0); } 25% { transform: translateY(-2px); } 50% { transform: translateY(-3px); } 75% { transform: translateY(-1px); } }
+
+/* Chispa — Claude Code (brasa pixel art con llama que parpadea; revisión 4c, diseño original) */
+.chispa .body { fill: #E5774A; } .chispa .core { fill: #F6B26B; } .chispa .shade { fill: #C25A34; } .chispa .eye { fill: #1A1210; }
+.chispa .tip-b, .chispa .eye-happy, .chispa .eye-x, .chispa .eye-shut { display: none; }
+.chispa[data-state='idle'] .tip-a { animation: chispa-tip-a 1.4s steps(1) infinite; }
+.chispa[data-state='idle'] .tip-b { display: inline; animation: chispa-tip-b 1.4s steps(1) infinite; }
+.chispa[data-state='idle'] .whole { animation: px-bob 2.8s steps(2) infinite; }
+.chispa[data-state='thinking'] .fx-think { display: inline; }
+.chispa[data-state='thinking'] .fx-think rect { animation: m-dot 1.2s steps(1) infinite; }
+.chispa[data-state='thinking'] .fx-think rect:nth-child(2) { animation-delay: .2s; }
+.chispa[data-state='thinking'] .fx-think rect:nth-child(3) { animation-delay: .4s; }
+.chispa[data-state='reading'] .prop-book { display: inline; }
+.chispa[data-state='editing'] .prop-pencil { display: inline; }
+.chispa[data-state='editing'] .core { animation: m-blink .5s steps(1) infinite; }
+.chispa[data-state='running'] .feet-a { animation: px-bob .4s steps(1) infinite; }
+.chispa[data-state='running'] .feet-b { animation: px-bob .4s steps(1) infinite reverse; }
+.chispa[data-state='running'] .tip-a { animation: chispa-tip-a .3s steps(1) infinite; }
+.chispa[data-state='running'] .tip-b { display: inline; animation: chispa-tip-b .3s steps(1) infinite; }
+.chispa[data-state='running'] .fx-run { display: inline; animation: m-blink .4s steps(1) infinite; }
+.chispa[data-state='permission'] .fx-ask { display: inline; }
+.chispa[data-state='permission'] .flame { transform: translateY(-1px); }
+.chispa[data-state='done'] .whole { animation: px-hop .8s steps(4) infinite; }
+.chispa[data-state='done'] .eye-open, .chispa[data-state='error'] .eye-open, .chispa[data-state='sleeping'] .eye-open { display: none; }
+.chispa[data-state='done'] .eye-happy { display: inline; }
+.chispa[data-state='done'] .fx-spark { display: inline; animation: m-blink .5s steps(1) infinite; }
+.chispa[data-state='error'] .whole { animation: px-shake .25s steps(2) infinite; }
+.chispa[data-state='error'] .body { fill: #C2665A; } .chispa[data-state='error'] .core { fill: #D98A7E; }
+.chispa[data-state='error'] .eye-x { display: inline; }
+.chispa[data-state='sleeping'] .eye-shut { display: inline; }
+.chispa[data-state='sleeping'] .tip-a, .chispa[data-state='sleeping'] .tip-b { display: none; }
+.chispa[data-state='sleeping'] .body { fill: #9A6A58; } .chispa[data-state='sleeping'] .core { fill: #B58C6E; } .chispa[data-state='sleeping'] .shade { fill: #7A5244; }
+.chispa[data-state='sleeping'] .fx-zz { display: inline; animation: m-float 2.4s steps(4) infinite; }
+@keyframes chispa-tip-a { 0% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes chispa-tip-b { 0% { opacity: 0; } 50% { opacity: 1; } }
+
+/* Nodo — Codex (hexágono de red con tres puertos y cara de glifo; revisión 4c, diseño original) */
+.nodo .cloud, .nodo .tilt { transform-box: fill-box; transform-origin: center; }
+.nodo .glyph { fill: none; stroke: #fff; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; }
+.nodo .glyph-fill { fill: #fff; }
+.nodo .port { fill: #C9C2FF; } .nodo .link { stroke: #C9C2FF; stroke-width: 4; stroke-linecap: round; }
+.nodo .face > g { display: none; }
+.nodo .face .f-idle { display: inline; }
+.nodo .cursor { animation: nodo-cursor 1.1s steps(1) infinite; }
+.nodo .stop-top { stop-color: #B9B4FF; } .nodo .stop-mid { stop-color: #7C74F2; } .nodo .stop-bot { stop-color: #4B3FD1; }
+.nodo .zz { display: none; }
+.nodo[data-state='idle'] .cloud { animation: nodo-breathe 3.2s ease-in-out infinite; }
+.nodo[data-state='thinking'] .face .f-idle, .nodo[data-state='running'] .face .f-idle, .nodo[data-state='permission'] .face .f-idle,
+.nodo[data-state='done'] .face .f-idle, .nodo[data-state='error'] .face .f-idle, .nodo[data-state='sleeping'] .face .f-idle { display: none; }
+.nodo[data-state='thinking'] .face .f-think { display: inline; }
+.nodo[data-state='thinking'] .f-think circle { animation: m-dot 1.2s steps(1) infinite; }
+.nodo[data-state='thinking'] .f-think circle:nth-child(2) { animation-delay: .2s; }
+.nodo[data-state='thinking'] .f-think circle:nth-child(3) { animation-delay: .4s; }
+.nodo[data-state='thinking'] .port { animation: m-dot 1.2s steps(1) infinite; }
+.nodo[data-state='reading'] .chev { animation: nodo-look 1.6s ease-in-out infinite; }
+.nodo[data-state='editing'] .cursor { animation: nodo-type .45s steps(3) infinite; transform-box: fill-box; transform-origin: 0 50%; }
+.nodo[data-state='running'] .face .f-run { display: inline; }
+.nodo[data-state='running'] .cloud { animation: nodo-sway .9s ease-in-out infinite; }
+.nodo[data-state='running'] .port { animation: m-blink .3s steps(1) infinite; }
+.nodo[data-state='permission'] .face .f-ask { display: inline; }
+.nodo[data-state='permission'] .stop-top { stop-color: #FFD27A; } .nodo[data-state='permission'] .stop-mid { stop-color: #F6A93B; } .nodo[data-state='permission'] .stop-bot { stop-color: #D9822B; }
+.nodo[data-state='permission'] .port { fill: #FBBF24; } .nodo[data-state='permission'] .link { stroke: #FBBF24; }
+.nodo[data-state='done'] .face .f-done { display: inline; }
+.nodo[data-state='done'] .cloud { animation: nodo-pop .9s ease-out infinite; }
+.nodo[data-state='error'] .face .f-err { display: inline; }
+.nodo[data-state='error'] .stop-top { stop-color: #FFA3A3; } .nodo[data-state='error'] .stop-mid { stop-color: #F26B6B; } .nodo[data-state='error'] .stop-bot { stop-color: #C93A4A; }
+.nodo[data-state='error'] .port { fill: #F87171; } .nodo[data-state='error'] .link { stroke: #F87171; }
+.nodo[data-state='sleeping'] .face .f-sleep { display: inline; }
+.nodo[data-state='sleeping'] .stop-top { stop-color: #706C98; } .nodo[data-state='sleeping'] .stop-mid { stop-color: #56528A; } .nodo[data-state='sleeping'] .stop-bot { stop-color: #3B3672; }
+.nodo[data-state='sleeping'] .port { fill: #3A4256; } .nodo[data-state='sleeping'] .link { stroke: #3A4256; }
+.nodo[data-state='sleeping'] .zz { display: inline; animation: m-float 2.4s ease-in-out infinite; }
+@keyframes nodo-cursor { 50% { opacity: 0; } }
+@keyframes nodo-breathe { 50% { transform: scale(1.03); } }
+@keyframes nodo-sway { 25% { transform: rotate(-6deg); } 75% { transform: rotate(6deg); } }
+@keyframes nodo-look { 50% { transform: translateX(6px); } }
+@keyframes nodo-type { 0% { transform: scaleX(.35); } 50% { transform: scaleX(.7); } 100% { transform: scaleX(1); } }
+@keyframes nodo-pop { 0% { transform: scale(1); } 30% { transform: scale(1.1); } 100% { transform: scale(1); } }
+@keyframes nodo-wobble { 25% { transform: rotate(-6deg); } 75% { transform: rotate(6deg); } }
+
+/* Astro — Antigravity (planetoide con anillo que levita; revisión 4c, diseño original) */
+.astro .float, .astro .bodyg, .astro .ground, .astro .orbit, .astro .ringg { transform-box: fill-box; transform-origin: center; }
+.astro .a1 { stop-color: #FFC2E2; } .astro .a2 { stop-color: #F28BC8; } .astro .a3 { stop-color: #9B6BE0; }
+.astro .ring { fill: none; stroke: #F7A8D6; stroke-width: 5; stroke-linecap: round; }
+.astro .ring-back { opacity: .5; }
+.astro .glyph { fill: none; stroke: #fff; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+.astro .glyph-fill { fill: #fff; }
+.astro .face > g, .astro .fx, .astro .zz { display: none; }
+.astro .face .f-idle { display: inline; }
+.astro[data-state='idle'] .float { animation: astro-float 3.2s ease-in-out infinite; }
+.astro[data-state='idle'] .ground { animation: astro-shadow 3.2s ease-in-out infinite; }
+.astro[data-state='thinking'] .float { transform: translateY(-4px); }
+.astro[data-state='thinking'] .face .f-idle { display: none; } .astro[data-state='thinking'] .face .f-think { display: inline; }
+.astro[data-state='thinking'] .f-think circle { animation: m-dot 1.2s steps(1) infinite; }
+.astro[data-state='thinking'] .f-think circle:nth-child(2) { animation-delay: .2s; }
+.astro[data-state='thinking'] .f-think circle:nth-child(3) { animation-delay: .4s; }
+.astro[data-state='thinking'] .orbit { display: inline; transform-box: view-box; transform-origin: 60px 62px; animation: astro-spin 2.4s linear infinite; }
+.astro[data-state='reading'] .f-idle { animation: astro-scan 1.6s ease-in-out infinite; }
+.astro[data-state='editing'] .face .f-idle { display: none; } .astro[data-state='editing'] .face .f-edit { display: inline; }
+.astro[data-state='editing'] .f-edit .cur { animation: nodo-cursor .8s steps(1) infinite; }
+.astro[data-state='running'] .ring { stroke-dasharray: 18 10; animation: astro-dash .6s linear infinite; }
+.astro[data-state='running'] .float { transform: translateY(-6px); }
+.astro[data-state='running'] .ground { transform: scaleX(.55); }
+.astro[data-state='running'] .trail { display: inline; animation: m-blink .35s steps(1) infinite; }
+.astro[data-state='permission'] .face .f-idle { display: none; } .astro[data-state='permission'] .face .f-ask { display: inline; }
+.astro[data-state='permission'] .a1 { stop-color: #FFD27A; } .astro[data-state='permission'] .a2 { stop-color: #F6A93B; } .astro[data-state='permission'] .a3 { stop-color: #D9822B; }
+.astro[data-state='permission'] .ring { stroke: #FBBF24; }
+.astro[data-state='permission'] .bodyg { animation: nodo-wobble .9s ease-in-out infinite; }
+.astro[data-state='done'] .face .f-idle { display: none; } .astro[data-state='done'] .face .f-done { display: inline; }
+.astro[data-state='done'] .bodyg { animation: nodo-pop .9s ease-out infinite; }
+.astro[data-state='done'] .burst { display: inline; animation: m-blink .6s steps(1) infinite; }
+.astro[data-state='error'] .face .f-idle { display: none; } .astro[data-state='error'] .face .f-err { display: inline; }
+.astro[data-state='error'] .a1 { stop-color: #FFA3A3; } .astro[data-state='error'] .a2 { stop-color: #F26B6B; } .astro[data-state='error'] .a3 { stop-color: #C93A4A; }
+.astro[data-state='error'] .ring { stroke: #F87171; }
+.astro[data-state='error'] .float { transform: translateY(8px) rotate(12deg); }
+.astro[data-state='error'] .ground { transform: scaleX(1.2); }
+.astro[data-state='sleeping'] .face .f-idle { display: none; } .astro[data-state='sleeping'] .face .f-sleep { display: inline; }
+.astro[data-state='sleeping'] .a1 { stop-color: #8A7C96; } .astro[data-state='sleeping'] .a2 { stop-color: #76668A; } .astro[data-state='sleeping'] .a3 { stop-color: #584E7E; }
+.astro[data-state='sleeping'] .ring { stroke: #6E6585; }
+.astro[data-state='sleeping'] .float { transform: translateY(8px); }
+.astro[data-state='sleeping'] .ground { transform: scaleX(1.2); }
+.astro[data-state='sleeping'] .zz { display: inline; animation: m-float 2.4s ease-in-out infinite; }
+@keyframes astro-float { 50% { transform: translateY(-6px); } }
+@keyframes astro-shadow { 50% { transform: scaleX(.75); opacity: .7; } }
+@keyframes astro-spin { to { transform: rotate(360deg); } }
+@keyframes astro-dash { to { stroke-dashoffset: -28; } }
+@keyframes astro-scan { 50% { transform: translateX(5px); } }
+
+/* Hondo — DeepSeek Harness (ballena geométrica de aletas horizontales y cara de glifo; revisión 4c, diseño original) */
+.hondo .swim, .hondo .tail, .hondo .face > g { transform-box: fill-box; }
+.hondo .swim, .hondo .face > g { transform-origin: center; }
+.hondo .tail { transform-origin: 100% 50%; }
+.hondo .h1 { stop-color: #8FE3F0; } .hondo .h2 { stop-color: #2FA7C9; } .hondo .h3 { stop-color: #1F6E9E; }
+.hondo .pleat { fill: none; stroke: #E6FBFF; stroke-width: 2; stroke-linecap: round; opacity: .35; }
+.hondo .glyph { fill: none; stroke: #fff; stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
+.hondo .glyph-fill { fill: #fff; }
+.hondo .face > g, .hondo .zz, .hondo .jet { display: none; }
+.hondo .face .f-idle { display: inline; }
+.hondo .wake { opacity: 0; transition: opacity .2s; }
+.hondo[data-state='idle'] .swim { animation: hondo-drift 4s ease-in-out infinite; }
+.hondo[data-state='thinking'] .face .f-idle { display: none; } .hondo[data-state='thinking'] .face .f-think { display: inline; }
+.hondo[data-state='thinking'] .f-think circle { animation: m-dot 1.2s steps(1) infinite; }
+.hondo[data-state='thinking'] .f-think circle:nth-child(2) { animation-delay: .2s; }
+.hondo[data-state='thinking'] .f-think circle:nth-child(3) { animation-delay: .4s; }
+.hondo[data-state='reading'] .f-idle { animation: astro-scan 1.6s ease-in-out infinite; }
+.hondo[data-state='editing'] .face .f-idle { display: none; } .hondo[data-state='editing'] .face .f-edit { display: inline; }
+.hondo[data-state='editing'] .f-edit .cur { animation: nodo-cursor .8s steps(1) infinite; }
+.hondo[data-state='editing'] .tail { animation: hondo-wag .6s ease-in-out infinite; }
+.hondo[data-state='running'] .face .f-idle { display: none; } .hondo[data-state='running'] .face .f-run { display: inline; }
+.hondo[data-state='running'] .swim { animation: hondo-swim .8s ease-in-out infinite; }
+.hondo[data-state='running'] .tail { animation: hondo-wag .4s ease-in-out infinite; }
+.hondo[data-state='running'] .wake { opacity: 1; }
+.hondo[data-state='permission'] .face .f-idle { display: none; } .hondo[data-state='permission'] .face .f-ask { display: inline; }
+.hondo[data-state='permission'] .h1 { stop-color: #FFD27A; } .hondo[data-state='permission'] .h2 { stop-color: #F6A93B; } .hondo[data-state='permission'] .h3 { stop-color: #D9822B; }
+.hondo[data-state='done'] .face .f-idle { display: none; } .hondo[data-state='done'] .face .f-done { display: inline; }
+.hondo[data-state='done'] .jet { display: inline; animation: m-blink .7s ease-in-out infinite; }
+.hondo[data-state='error'] .face .f-idle { display: none; } .hondo[data-state='error'] .face .f-err { display: inline; }
+.hondo[data-state='error'] .h1 { stop-color: #FFA3A3; } .hondo[data-state='error'] .h2 { stop-color: #F26B6B; } .hondo[data-state='error'] .h3 { stop-color: #C93A4A; }
+.hondo[data-state='error'] .swim { animation: px-shake .2s steps(2) infinite; }
+.hondo[data-state='sleeping'] .face .f-idle { display: none; } .hondo[data-state='sleeping'] .face .f-sleep { display: inline; }
+.hondo[data-state='sleeping'] .h1 { stop-color: #6E98A3; } .hondo[data-state='sleeping'] .h2 { stop-color: #4E7486; } .hondo[data-state='sleeping'] .h3 { stop-color: #35526A; }
+.hondo[data-state='sleeping'] .swim { transform: translateY(4px); }
+.hondo[data-state='sleeping'] .zz { display: inline; animation: m-float 2.4s ease-in-out infinite; }
+@keyframes hondo-drift { 50% { transform: translateY(-3px); } }
+@keyframes hondo-swim { 0%,100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
+@keyframes hondo-wag { 50% { transform: rotate(-10deg); } }
+
+/* Michi — mascota del usuario (gato pixel art; sustituye a Vigía en la revisión 4) */
+.michi { shape-rendering: crispEdges; overflow: visible; }
+.michi .fur { fill: #8E97B0; } .michi .fur-d { fill: #6E7790; } .michi .fur-l { fill: #B9C1D6; }
+.michi .iris { fill: #C9C2FF; } .michi .pupil { fill: #0A0D14; } .michi .nose { fill: #E9A3B8; } .michi .collar { fill: #8B7CF6; } .michi .whisk { fill: #6E7A96; }
+.michi .whole { transform-box: fill-box; transform-origin: 50% 100%; }
+.michi .tail-b, .michi .tail-up, .michi .eye-happy, .michi .eye-shut, .michi .fx { display: none; }
+.michi[data-mood='watching'] .tail-a { animation: michi-tail-a 1.6s steps(1) infinite; }
+.michi[data-mood='watching'] .tail-b { display: inline; animation: michi-tail-b 1.6s steps(1) infinite; }
+.michi[data-mood='alert'] .tail-a { display: none; } .michi[data-mood='alert'] .tail-up { display: inline; }
+.michi[data-mood='alert'] .ears { transform: translateY(-1px); }
+.michi[data-mood='alert'] .fx-ask { display: inline; animation: m-blink .8s steps(1) infinite; }
+.michi[data-mood='alarm'] .tail-a { display: none; } .michi[data-mood='alarm'] .tail-up { display: inline; }
+.michi[data-mood='alarm'] .whole { animation: px-shake .22s steps(2) infinite; }
+.michi[data-mood='alarm'] .fx-bang { display: inline; }
+.michi[data-mood='happy'] .eyes-open { display: none; } .michi[data-mood='happy'] .eye-happy { display: inline; }
+.michi[data-mood='happy'] .whole { animation: px-hop .9s steps(4) infinite; }
+.michi[data-mood='sleeping'] .eyes-open, .michi[data-mood='alone'] .eyes-open { display: none; }
+.michi[data-mood='sleeping'] .eye-shut, .michi[data-mood='alone'] .eye-shut { display: inline; }
+.michi[data-mood='sleeping'] .fx-zz, .michi[data-mood='alone'] .fx-zz { display: inline; animation: m-float 2.4s steps(4) infinite; }
+.michi[data-mood='sleeping'] .upper, .michi[data-mood='alone'] .upper { transform: translateY(1px); }
+@keyframes michi-tail-a { 0% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes michi-tail-b { 0% { opacity: 0; } 50% { opacity: 1; } }
+
+/* ---------- calma ---------- */
+.calm *, .calm *::before, .calm *::after { animation: none !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; } }
+
+/* ---------- responsive ---------- */
+@media (max-width: 480px) {
+  .dock { padding: 5px 4px 5px 6px; gap: 2px; }
+  .dock[data-size="normal"] { --slot: 54px; --pet: 34px; }
+  .dock[data-size="compact"] { --slot: 46px; --pet: 28px; }
+  .times { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .agent-row { grid-template-columns: 28px 32px minmax(0, 1fr) auto; }
+  .agent-row .moves { grid-column: 2 / -1; justify-content: flex-end; }
+  .agent-row .mini { width: 30px; height: 30px; }
+}
+</style>
+</head>
+<body data-view="dock">
+
+<section class="dock-wrap" id="dockWrap" aria-label="Dock de agentes">
+  <div class="dock" id="dock" role="toolbar" aria-label="Agentes en el dock" aria-orientation="horizontal" data-size="normal"></div>
+</section>
+
+<div class="flyout" id="flyout" role="dialog" aria-modal="false" aria-labelledby="flyTitle" hidden></div>
+
+<main class="wrap">
+  <header class="top">
+    <div>
+      <h1>Overseer · escritorio</h1>
+      <p>Propuesta de la revisión 5: un dock arriba con las mascotas de tus agentes, un flyout con lo que hace cada uno y subestados para distinguir tareas largas. Haz clic en una mascota o usa <kbd>Tab</kbd> y las flechas.</p>
+    </div>
+    <div class="controls">
+      <span class="tag">Prototipo · datos de ejemplo</span>
+      <button class="btn" id="autoplay" type="button" aria-pressed="true">Simulación en marcha</button>
+      <button class="btn" id="calmBtn" type="button" aria-pressed="false">Modo calma</button>
+      <button class="btn" id="openSettings" type="button"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Ajustes de vista</button>
+    </div>
+  </header>
+
+  <section class="desk" aria-label="Escritorio simulado">
+    <p><b>Tu escritorio.</b> En modo dock, Overseer solo ocupa la barra de arriba. Déjala abierta en una ventana estrecha o instalada como app mientras trabajas.</p>
+    <p class="hint">Cambia a «Cabinas» desde Ajustes de vista para ver la vista completa.</p>
+  </section>
+
+  <section class="cabins-section" aria-labelledby="cabTitle">
+    <div class="section-head"><h2 id="cabTitle">Cabinas</h2><p>Resumen de la vista completa con los mismos datos. La especificación de las cabinas sigue en <code>prototype-v4.html</code>.</p></div>
+    <div class="cabins" id="cabins"></div>
+  </section>
+
+  <section aria-labelledby="catTitle">
+    <div class="section-head">
+      <div><h2 id="catTitle">Catálogo de subestados</h2>
+        <p>Doce subestados dentro de leer, editar y ejecutar. Cada uno añade una insignia y un movimiento del contenedor; la mascota y sus nueve estados no cambian.</p></div>
+      <div class="seg" role="group" aria-label="Mascota del catálogo" id="catPick"></div>
+    </div>
+    <div class="catalog" id="catalog"></div>
+  </section>
+
+  <section class="card" aria-labelledby="notesTitle">
+    <div class="section-head"><h2 id="notesTitle">Qué revisar</h2></div>
+    <ul class="notes">
+      <li><b>Etiqueta siempre visible.</b> Cada ranura del dock lleva un punto de estado y una etiqueta corta; el estado nunca depende solo de la mascota.</li>
+      <li><b>Anillo de tiempo.</b> Se llena en un minuto dentro del mismo estado y vuelve a empezar; ámbar y pulsante si pide permiso, rojo si hay error.</li>
+      <li><b>Variaciones por permanencia.</b> Tras 20 s en el mismo subestado, la mascota mira a un lado, se estira o se reacomoda cada 6–11 s para que una tarea larga no se vea congelada.</li>
+      <li><b>Esperando subagentes.</b> La mascota pausa su animación propia y se balancea despacio; la insignia muestra un reloj de arena con satélites.</li>
+      <li><b>Calma.</b> Modo calma o movimiento reducido: insignias estáticas, sin movimiento del contenedor, sin variaciones y sin anillo animado.</li>
+      <li><b>Un solo bucle.</b> Mirada, anillos, relojes y variaciones comparten un único <code>requestAnimationFrame</code>, que se detiene con la pestaña oculta.</li>
+    </ul>
+  </section>
+  <p class="sr-only" aria-live="polite" id="announce"></p>
+</main>
+
+<dialog class="settings" id="settings" aria-labelledby="setTitle">
+  <form method="dialog" id="setForm">
+    <div class="set-head">
+      <svg class="michi" id="michiSet" viewBox="0 0 24 24" role="img" aria-label="Michi"></svg>
+      <div><h2 id="setTitle">Ajustes de vista</h2><p>Michi vigila a los agentes que muestres. Los cambios se aplican al momento.</p></div>
+      <button class="icon-btn" value="close" aria-label="Cerrar ajustes"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <fieldset>
+      <legend class="group-label">Vista</legend>
+      <div class="seg" role="group" aria-label="Vista" id="setView">
+        <button type="button" data-view="dock">Dock superior</button><button type="button" data-view="cabins">Cabinas</button>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend class="group-label">Agentes y orden</legend>
+      <ol class="agent-list" id="setAgents"></ol>
+      <p class="hint">El orden es el mismo en el dock y en las cabinas. Arrastra desde el asa o usa las flechas. El interruptor solo afecta al dock.</p>
+    </fieldset>
+    <fieldset>
+      <legend class="group-label">Tamaño del dock</legend>
+      <div class="seg" role="group" aria-label="Tamaño del dock" id="setSize">
+        <button type="button" data-size="normal">Normal</button><button type="button" data-size="compact">Compacto</button>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend class="group-label">Simular equipo</legend>
+      <div class="seg" role="group" aria-label="Agentes detectados" id="setDetected">
+        <button type="button" data-n="1">1 agente</button><button type="button" data-n="2">2</button><button type="button" data-n="3">3</button><button type="button" data-n="4">4</button>
+      </div>
+      <p class="hint">En la app lo decide el backend al detectar cada instalación. Un agente no detectado aparece atenuado y no se puede activar.</p>
+    </fieldset>
+    <div class="set-foot">
+      <span class="saved" id="saved">Guardado en este navegador · en la app: PUT /api/preferences</span>
+      <button class="btn primary" value="close">Listo</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(() => {
+  'use strict';
+  /* ---------- datos ---------- */
+  const STATES = [['idle','En espera'],['thinking','Pensando'],['reading','Leyendo'],['editing','Editando'],['running','Ejecutando'],
+    ['permission','Pide permiso'],['done','Terminó'],['error','Error'],['sleeping','Durmiendo']];
+  const LABEL = Object.fromEntries(STATES);
+  const SHORT = { idle: 'REPOSO', thinking: 'PIENSA', reading: 'LEE', editing: 'EDITA', running: 'EJECUTA', permission: 'PERMISO', done: 'LISTO', error: 'ERROR', sleeping: 'DUERME' };
+  const ACTIVE = new Set(['thinking','reading','editing','running','permission']);
+  const AGENTS = {
+    claude:      { name: 'Claude Code',      mascot: 'Chispa', kind: 'chispa', color: '#EE8B66' },
+    codex:       { name: 'Codex',            mascot: 'Nodo',   kind: 'nodo',   color: '#8FA2FF' },
+    antigravity: { name: 'Antigravity',      mascot: 'Astro',  kind: 'astro',  color: '#F28BC8' },
+    deepseek:    { name: 'DeepSeek Harness', mascot: 'Hondo',  kind: 'hondo',  color: '#5CC8F5' },
+  };
+  const IDS = Object.keys(AGENTS);
+  const COLOR = Object.fromEntries(IDS.map((id) => [id, AGENTS[id].color]));
+
+  /* subestado: [estado base, etiqueta larga, etiqueta corta, regla] */
+  const ACT = {
+    'read.file':   ['reading', 'Inspeccionando un archivo', 'ARCHIVO', 'Read, view_file o cat con un solo objetivo'],
+    'read.batch':  ['reading', 'Leyendo en lote',           'LOTE',    'Grep, rg, find o varias lecturas seguidas'],
+    'read.tree':   ['reading', 'Recorriendo el árbol',      'ÁRBOL',   'Glob, ls, tree o list_dir'],
+    'read.web':    ['reading', 'Consultando la web',        'WEB',     'WebSearch, WebFetch o search_web'],
+    'edit.file':   ['editing', 'Editando un archivo',       'EDITA',   'Edit, Write o replace_file_content'],
+    'edit.multi':  ['editing', 'Editando varios archivos',  'MULTI',   'MultiEdit o apply_patch con varios archivos'],
+    'run.shell':   ['running', 'Ejecutando en la shell',    'SHELL',   'Cualquier otro comando'],
+    'run.test':    ['running', 'Ejecutando pruebas',        'TESTS',   'vitest, jest, pytest, mvn test, node --test…'],
+    'run.build':   ['running', 'Compilando',                'BUILD',   'ng build, tsc, mvn package, docker build…'],
+    'run.install': ['running', 'Instalando dependencias',   'DEPS',    'npm ci, pip install, mvn dependency…'],
+    'run.net':     ['running', 'Llamando a una API',        'API',     'Herramientas MCP, curl, gh api'],
+    'run.wait':    ['running', 'Esperando subagentes',      'ESPERA',  'Task o Agent, wait, o subagentes activos'],
+  };
+  const KIND = { file: 'Archivo', files: 'Archivos', tree: 'Árbol', url: 'URL', command: 'Comando', agents: 'Subagentes' };
+
+  /* ---------- insignias ---------- */
+  const BADGE = {
+    'read.file':   '<g class="lens"><circle cx="8.5" cy="8.5" r="5"/><line x1="12.2" y1="12.2" x2="17" y2="17"/></g>',
+    'read.batch':  '<rect x="2.5" y="6.5" width="9" height="11" rx="1.5" class="w"/><rect class="p2" x="5.5" y="4.5" width="9" height="11" rx="1.5"/><g class="p3"><rect x="8.5" y="2.5" width="9" height="11" rx="1.5" class="af"/><line x1="11" y1="6.5" x2="15" y2="6.5" stroke="var(--stage)"/><line x1="11" y1="9.5" x2="14" y2="9.5" stroke="var(--stage)"/></g>',
+    'read.tree':   '<path class="w" d="M5 6v9.5M5 9h6M5 15.5h6"/><circle class="n af" cx="5" cy="4" r="2.2"/><circle class="n n2 af" cx="13.5" cy="9" r="2.2"/><circle class="n n3 af" cx="13.5" cy="15.5" r="2.2"/>',
+    'read.web':    '<circle cx="10" cy="10" r="7.5"/><line class="w" x1="2.5" y1="10" x2="17.5" y2="10"/><ellipse class="mer w" cx="10" cy="10" rx="3.2" ry="7.5"/>',
+    'edit.file':   '<path d="M12.5 3.5l4 4-8 8H4.5v-4z"/><line class="ln w" x1="3" y1="18" x2="17" y2="18"/>',
+    'edit.multi':  '<rect class="w" x="2" y="5" width="7" height="10" rx="1.2"/><rect class="w" x="11" y="5" width="7" height="10" rx="1.2"/><g class="pen"><path d="M16 1.5l2.5 2.5-5 5h-2.5v-2.5z" class="af"/></g><line x1="3.5" y1="18" x2="7.5" y2="18"/><line x1="12.5" y1="18" x2="16.5" y2="18"/>',
+    'run.shell':   '<polyline points="3,5 8,10 3,15"/><line class="cur w" x1="10" y1="15" x2="17" y2="15"/>',
+    'run.test':    '<rect class="t" x="2" y="7" width="4.5" height="6" rx="1" fill="var(--line-strong)" stroke="none"/><rect class="t t2" x="7.75" y="7" width="4.5" height="6" rx="1" fill="var(--line-strong)" stroke="none"/><rect class="t t3" x="13.5" y="7" width="4.5" height="6" rx="1" fill="var(--line-strong)" stroke="none"/><polyline class="w" points="5,17 7.5,19 12,15" stroke-width="1.6"/>',
+    'run.build':   '<rect x="2" y="13.5" width="16" height="4.5" rx="1"/><rect class="k k2 af" x="4.5" y="8" width="11" height="4.5" rx="1"/><rect class="k k3 af" x="7" y="2.5" width="6" height="4.5" rx="1"/>',
+    'run.install': '<path class="w" d="M3 9.5h14v8H3z"/><path class="w" d="M3 9.5l2-3h10l2 3"/><g class="arr"><line x1="10" y1="0.5" x2="10" y2="7"/><polyline points="7.5,4.5 10,7 12.5,4.5"/></g>',
+    'run.net':     '<circle class="af" cx="4" cy="16" r="2"/><path class="arc" d="M4 11a5 5 0 0 1 5 5"/><path class="arc a2" d="M4 7a9 9 0 0 1 9 9"/><path class="arc a3" d="M4 3a13 13 0 0 1 13 13"/>',
+    'run.wait':    '<g class="glass"><path class="w" d="M6 3h8M6 17h8M7 3c0 4 6 4 6 7s-6 3-6 7M13 3c0 4-6 4-6 7s6 3 6 7"/></g><g class="sat"><circle class="af" cx="10" cy="0.5" r="1.6"/><circle class="af" cx="10" cy="19.5" r="1.6"/></g>',
+  };
+  const badgeSvg = (a) => a ? `<svg class="bdg b-${a.replace('.', '-')}" viewBox="0 0 20 20" aria-hidden="true">${BADGE[a]}</svg>` : '';
+
+  /* ---------- guion de la simulación: [estado, subestado, herramienta, tipo de objetivo, objetivo] ---------- */
+  const SCRIPT = {
+    claude: [
+      ['thinking', null, '—', null, 'Plan de la fase 18: clasificador de subestados'],
+      ['reading', 'read.file', 'Read', 'file', 'frontend/src/app/mascots/mascot-state.ts'],
+      ['reading', 'read.batch', 'Grep', 'files', '"classify(" · 7 coincidencias en 4 archivos'],
+      ['editing', 'edit.file', 'Edit', 'file', 'frontend/src/app/mascots/activity.ts'],
+      ['running', 'run.test', 'Bash', 'command', 'npx vitest run src/app/mascots'],
+      ['running', 'run.wait', 'Task', 'agents', '2 subagentes: revisión de accesibilidad · tabla de casos'],
+      ['done', null, 'Stop', null, 'Turno terminado · 4 archivos cambiados'],
+    ],
+    codex: [
+      ['thinking', null, '—', null, 'Leyendo el rollout de la sesión madre'],
+      ['reading', 'read.tree', 'exec_command', 'tree', 'rg --files frontend/src/app'],
+      ['editing', 'edit.multi', 'apply_patch', 'files', 'dock-bar.component.ts · dock-slot.component.ts · app.component.ts'],
+      ['running', 'run.install', 'exec_command', 'command', 'npm ci'],
+      ['permission', null, 'exec_command', 'command', 'Quiere ejecutar npm ci fuera del sandbox'],
+      ['running', 'run.build', 'exec_command', 'command', 'npx ng build --configuration production'],
+      ['done', null, 'task_complete', null, 'Turno terminado · 1 min 12 s'],
+    ],
+    antigravity: [
+      ['thinking', null, 'PreInvocation', null, 'gemini · invocación 3'],
+      ['reading', 'read.web', 'search_web', 'url', 'developer.mozilla.org/docs/Web/API/Popover_API'],
+      ['running', 'run.shell', 'run_command', 'command', 'node integrations/doctor.mjs --json'],
+      ['error', null, 'run_command', 'command', 'node --test: 1 prueba fallida'],
+      ['editing', 'edit.file', 'replace_file_content', 'file', 'integrations/antigravity-hook.mjs'],
+      ['running', 'run.test', 'run_command', 'command', 'node --test integrations/'],
+      ['done', null, 'Stop', null, 'terminationReason: completed'],
+      ['sleeping', null, '—', null, '10 min sin eventos'],
+    ],
+    deepseek: [
+      ['thinking', null, 'agent/pre-step', null, 'deepseek · paso 7'],
+      ['running', 'run.net', 'tools/execute · mcp', 'url', 'api.github.com/repos/FerS00/Overseer/pulls'],
+      ['reading', 'read.file', 'tools/execute · read', 'file', 'docs/PLAN_PROYECTO.md'],
+      ['editing', 'edit.file', 'tools/execute · write', 'file', 'design-system/agent-ops/DESIGN.md'],
+      ['permission', null, 'tools/execute · write', 'file', 'Aprobación de escritura fuera del workspace'],
+      ['idle', null, '—', null, 'Sin actividad'],
+    ],
+  };
+
+  /* ---------- preferencias (en la app: GET/PUT /api/preferences + localStorage) ---------- */
+  const KEY = 'overseer-desktop-proto';
+  const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch { return {}; } };
+  const saved = load();
+  const prefs = {
+    viewMode: saved.viewMode === 'cabins' ? 'cabins' : 'dock',
+    agentOrder: Array.isArray(saved.agentOrder) && saved.agentOrder.length === 4 && IDS.every((id) => saved.agentOrder.includes(id)) ? saved.agentOrder : [...IDS],
+    dockHiddenAgents: Array.isArray(saved.dockHiddenAgents) ? saved.dockHiddenAgents.filter((id) => IDS.includes(id)) : [],
+    dockSize: saved.dockSize === 'compact' ? 'compact' : 'normal',
+    detected: [1, 2, 3, 4].includes(saved.detected) ? saved.detected : 4,
+  };
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch { /* opcional */ } };
+  const detected = (id) => IDS.indexOf(id) < prefs.detected;
+  const dockVisible = () => prefs.agentOrder.filter((id) => detected(id) && !prefs.dockHiddenAgents.includes(id));
+  const cabinVisible = () => prefs.agentOrder.filter(detected);
+
+  /* ---------- estado vivo ---------- */
+  const T0 = Date.now();
+  const live = {};
+  const SESSION_AGE = { claude: 12 * 60e3 + 4e3, codex: 34 * 60e3, antigravity: 3 * 60e3 + 40e3, deepseek: 58 * 60e3 };
+  const START_STEP = { claude: 4, codex: 2, antigravity: 1, deepseek: 1 };
+  const TOOLS = { claude: 42, codex: 17, antigravity: 9, deepseek: 23 };
+  for (const id of IDS) {
+    live[id] = { step: START_STEP[id], since: T0 - 8000 - IDS.indexOf(id) * 9000, sessionStart: T0 - SESSION_AGE[id], tools: TOOLS[id], log: [] };
+    const sc = SCRIPT[id];
+    for (let i = 0; i <= START_STEP[id]; i++) live[id].log.push({ at: T0 - (START_STEP[id] - i) * 23000 - 8000, entry: sc[i] });
+  }
+  const entryOf = (id) => SCRIPT[id][live[id].step];
+  const stateOf = (id) => entryOf(id)[0];
+  const actOf = (id) => entryOf(id)[1];
+
+  let calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = (id) => document.getElementById(id);
+  const announce = (t) => { $('announce').textContent = ''; queueMicrotask(() => { $('announce').textContent = t; }); };
+
+  /* ---------- plantillas SVG copiadas de prototype-v4.html (4c) ---------- */
+  const r = (x, y, w, h, c) => `<rect class="${c}" x="${x}" y="${y}" width="${w}" height="${h}"/>`;
+  const rf = (x, y, w, h, f) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${f}"/>`;
+  const SVG = {
+    chispa: () => `<svg class="chispa px" viewBox="0 0 24 24" role="img"><g class="whole">
+      <g class="feet-a">${r(9,18,2,1,'shade')}</g><g class="feet-b">${r(13,18,2,1,'shade')}</g>
+      <g class="flame">
+        <g class="tip-a">${r(12,3,1,1,'body')}${r(11,4,2,1,'body')}${r(11,5,3,1,'body')}</g>
+        <g class="tip-b">${r(11,3,1,1,'body')}${r(11,4,2,1,'body')}${r(11,5,3,1,'body')}${r(13,4,1,1,'body')}</g>
+        ${r(10,6,4,1,'body')}${r(9,7,6,1,'body')}${r(8,8,8,1,'body')}${r(7,9,10,7,'body')}${r(8,16,8,1,'body')}${r(9,17,6,1,'shade')}
+        ${r(11,12,2,1,'core')}${r(10,13,4,3,'core')}${r(11,16,2,1,'core')}
+      </g>
+      <g class="eyes" data-look><g class="eye-open">${r(10,10,1,2,'eye')}${r(13,10,1,2,'eye')}</g>
+        <g class="eye-happy">${r(9,11,1,1,'eye')}${r(10,10,1,1,'eye')}${r(11,11,1,1,'eye')}${r(12,11,1,1,'eye')}${r(13,10,1,1,'eye')}${r(14,11,1,1,'eye')}</g>
+        <g class="eye-x">${r(9,10,1,1,'eye')}${r(11,10,1,1,'eye')}${r(10,11,1,1,'eye')}${r(9,12,1,1,'eye')}${r(11,12,1,1,'eye')}${r(12,10,1,1,'eye')}${r(14,10,1,1,'eye')}${r(13,11,1,1,'eye')}${r(12,12,1,1,'eye')}${r(14,12,1,1,'eye')}</g>
+        <g class="eye-shut">${r(9,11,2,1,'eye')}${r(13,11,2,1,'eye')}</g></g>
+      <g class="prop prop-book">${rf(2,12,4,3,'#E8ECF4')}${rf(4,12,1,3,'#98A2B8')}</g><g class="prop prop-pencil">${rf(19,8,1,4,'#FBBF24')}${rf(19,12,1,1,'#E8ECF4')}</g>
+      <g class="fx fx-think">${rf(16,2,1,1,'#E8ECF4')}${rf(18,2,1,1,'#E8ECF4')}${rf(20,2,1,1,'#E8ECF4')}</g>
+      <g class="fx fx-run">${rf(5,7,1,1,'#F6B26B')}${rf(18,5,1,1,'#F6B26B')}${rf(4,11,1,1,'#E5774A')}${rf(19,10,1,1,'#E5774A')}</g>
+      <g class="fx fx-ask">${ask(17,0)}</g>
+      <g class="fx fx-spark">${rf(4,5,1,1,'#FBBF24')}${rf(19,4,1,1,'#FBBF24')}${rf(6,2,1,1,'#FBBF24')}</g>
+      <g class="fx fx-zz">${zz(17,2)}</g></g></svg>`,
+    nodo: (uid) => `<svg class="nodo" viewBox="0 0 120 120" role="img"><defs><linearGradient id="${uid}" x1="0" y1="16" x2="0" y2="104" gradientUnits="userSpaceOnUse">
+      <stop class="stop-top" offset="0"/><stop class="stop-mid" offset=".5"/><stop class="stop-bot" offset="1"/></linearGradient></defs>
+      <ellipse cx="60" cy="116" rx="30" ry="3.5" fill="rgba(0,0,0,.55)"/>
+      <g class="tilt" data-look><g class="cloud">
+        <line class="link" x1="60" y1="20" x2="60" y2="6"/><line class="link" x1="95" y1="80" x2="107" y2="87"/><line class="link" x1="25" y1="80" x2="13" y2="87"/>
+        <circle class="port" cx="60" cy="6" r="5.5"/><circle class="port" cx="107" cy="87" r="5.5"/><circle class="port" cx="13" cy="87" r="5.5"/>
+        <polygon points="60,20 95,40 95,80 60,100 25,80 25,40" fill="url(#${uid})" stroke="url(#${uid})" stroke-width="14" stroke-linejoin="round"/>
+      </g>
+      <g class="face"><g class="f-idle"><polyline class="glyph chev" points="40,48 51,60 40,72"/><line class="glyph cursor" x1="60" y1="72" x2="78" y2="72"/></g>
+        <g class="f-think"><circle class="glyph-fill" cx="45" cy="60" r="4.5"/><circle class="glyph-fill" cx="60" cy="60" r="4.5"/><circle class="glyph-fill" cx="75" cy="60" r="4.5"/></g>
+        <g class="f-run"><polyline class="glyph" points="36,48 47,60 36,72"/><polyline class="glyph c2" points="52,48 63,60 52,72"/><line class="glyph cursor" x1="68" y1="72" x2="82" y2="72"/></g>
+        <g class="f-ask"><path class="glyph" d="M51 49 q9 -9 18 0 q3 9 -9 12 v5"/><circle class="glyph-fill" cx="60" cy="76" r="4"/></g>
+        <g class="f-done"><polyline class="glyph" points="44,60 55,71 76,48"/></g>
+        <g class="f-err"><line class="glyph" x1="47" y1="47" x2="73" y2="73"/><line class="glyph" x1="73" y1="47" x2="47" y2="73"/></g>
+        <g class="f-sleep"><line class="glyph" x1="40" y1="60" x2="52" y2="60"/><line class="glyph" x1="68" y1="60" x2="80" y2="60"/></g></g></g>
+      <g class="zz"><text x="98" y="26" fill="#98A2B8" font-family="ui-monospace,monospace" font-size="16">z</text></g></svg>`,
+    astro: (uid) => `<svg class="astro" viewBox="0 0 120 120" role="img"><defs><linearGradient id="${uid}" x1="30" y1="30" x2="92" y2="96" gradientUnits="userSpaceOnUse">
+      <stop class="a1" offset="0"/><stop class="a2" offset=".5"/><stop class="a3" offset="1"/></linearGradient></defs>
+      <ellipse class="ground" cx="60" cy="114" rx="24" ry="3.5" fill="rgba(0,0,0,.55)"/>
+      <g class="float"><g data-look><g class="bodyg">
+        <g class="fx trail" stroke="#B58CF0" stroke-width="3" stroke-linecap="round"><line x1="46" y1="102" x2="46" y2="110"/><line x1="60" y1="104" x2="60" y2="114"/><line x1="74" y1="102" x2="74" y2="110"/></g>
+        <g transform="rotate(-16 60 62)"><path class="ring ring-back" d="M8 62 A52 14 0 0 1 112 62"/></g>
+        <circle cx="60" cy="62" r="33" fill="url(#${uid})"/>
+        <g transform="rotate(-16 60 62)"><path class="ring" d="M8 62 A52 14 0 0 0 112 62"/></g>
+        <g class="face">
+          <g class="f-idle"><rect class="glyph-fill" x="50" y="50" width="6" height="12" rx="3"/><rect class="glyph-fill" x="64" y="50" width="6" height="12" rx="3"/></g>
+          <g class="f-think"><circle class="glyph-fill" cx="50" cy="56" r="3.4"/><circle class="glyph-fill" cx="60" cy="56" r="3.4"/><circle class="glyph-fill" cx="70" cy="56" r="3.4"/></g>
+          <g class="f-edit"><rect class="glyph-fill" x="50" y="50" width="6" height="12" rx="3"/><line class="glyph cur" x1="64" y1="62" x2="72" y2="62"/></g>
+          <g class="f-ask"><path class="glyph" d="M53 49 q7 -8 14 0 q2 7 -7 10 v4"/><circle class="glyph-fill" cx="60" cy="68" r="2.8"/></g>
+          <g class="f-done"><polyline class="glyph" points="50,56 57,63 71,49"/></g>
+          <g class="f-err"><line class="glyph" x1="52" y1="49" x2="68" y2="65"/><line class="glyph" x1="68" y1="49" x2="52" y2="65"/></g>
+          <g class="f-sleep"><line class="glyph" x1="49" y1="57" x2="56" y2="57"/><line class="glyph" x1="64" y1="57" x2="71" y2="57"/></g>
+        </g>
+      </g></g></g>
+      <g class="fx orbit"><circle cx="104" cy="40" r="5" fill="#F7A8D6"/></g>
+      <g class="fx burst" fill="#FFD27A"><circle cx="18" cy="26" r="3.5"/><circle cx="102" cy="22" r="2.5"/><circle cx="106" cy="94" r="3"/></g>
+      <g class="zz"><text x="96" y="24" fill="#98A2B8" font-family="ui-monospace,monospace" font-size="16">z</text></g></svg>`,
+    hondo: (uid) => `<svg class="hondo" viewBox="0 0 120 120" role="img"><defs><linearGradient id="${uid}" x1="0" y1="34" x2="0" y2="96" gradientUnits="userSpaceOnUse">
+      <stop class="h1" offset="0"/><stop class="h2" offset=".55"/><stop class="h3" offset="1"/></linearGradient></defs>
+      <ellipse cx="62" cy="110" rx="36" ry="3.5" fill="rgba(0,0,0,.55)"/>
+      <g class="wake" stroke="#5CC8F5" stroke-width="3" stroke-linecap="round" fill="none"><line x1="2" y1="94" x2="14" y2="94"/><line x1="6" y1="102" x2="18" y2="102"/></g>
+      <g class="swim"><g data-look>
+        <path class="tail" d="M34 64 L20 61 C16 52 8 48 4 51 C8 56 11 61 13 66 C11 71 8 76 4 81 C8 84 16 80 20 71 L34 70 Z" fill="url(#${uid})"/>
+        <path d="M108 66 C108 46 92 36 70 36 C50 36 36 46 31 60 C29 68 31 78 37 84 C47 94 59 96 71 96 C93 96 108 84 108 66 Z" fill="url(#${uid})"/>
+        <path class="pleat" d="M60 91 Q82 92 100 79"/><path class="pleat" d="M56 85 Q78 87 96 74"/>
+        <g class="face">
+          <g class="f-idle"><circle class="glyph-fill" cx="88" cy="58" r="4.5"/></g>
+          <g class="f-think"><circle class="glyph-fill" cx="78" cy="60" r="3"/><circle class="glyph-fill" cx="87" cy="60" r="3"/><circle class="glyph-fill" cx="96" cy="60" r="3"/></g>
+          <g class="f-edit"><circle class="glyph-fill" cx="88" cy="58" r="4.5"/><line class="glyph cur" x1="80" y1="70" x2="94" y2="70"/></g>
+          <g class="f-run"><polyline class="glyph" points="80,51 87,58 80,65"/><polyline class="glyph" points="89,51 96,58 89,65"/></g>
+          <g class="f-ask"><path class="glyph" d="M82 51 q6 -7 12 0 q2 6 -6 9 v3"/><circle class="glyph-fill" cx="88" cy="68" r="2.6"/></g>
+          <g class="f-done"><polyline class="glyph" points="80,59 86,65 97,52"/></g>
+          <g class="f-err"><line class="glyph" x1="82" y1="52" x2="94" y2="64"/><line class="glyph" x1="94" y1="52" x2="82" y2="64"/></g>
+          <g class="f-sleep"><line class="glyph" x1="82" y1="59" x2="94" y2="59"/></g>
+        </g>
+      </g></g>
+      <g class="jet" stroke="#9BE2FF" stroke-width="3" stroke-linecap="round" fill="none"><path d="M78 32 C74 22 68 18 60 18"/><path d="M82 32 C86 22 92 18 100 18"/><line x1="80" y1="30" x2="80" y2="14"/></g>
+      <g class="zz"><text x="100" y="30" fill="#98A2B8" font-family="ui-monospace,monospace" font-size="16">z</text></g></svg>`,
+  };
+  function ask(x, y) { return rf(x,y+1,7,8,'#FBBF24') + rf(x+2,y+2,3,1,'#0A0D14') + rf(x+1,y+3,1,1,'#0A0D14') + rf(x+5,y+3,1,1,'#0A0D14') + rf(x+4,y+4,1,1,'#0A0D14') + rf(x+3,y+5,1,1,'#0A0D14') + rf(x+3,y+7,1,1,'#0A0D14'); }
+  function zz(x, y) { return rf(x,y+1,4,1,'#98A2B8') + rf(x+2,y+2,1,1,'#98A2B8') + rf(x+1,y+3,1,1,'#98A2B8') + rf(x,y+4,4,1,'#98A2B8'); }
+
+  /* Michi: gato sentado de frente, rejilla 24×24 */
+  function michiMarkup(leds) {
+    return `<g class="whole">
+      <g class="tail-a">${r(18,18,2,1,'fur-d')}${r(20,15,1,4,'fur-d')}${r(21,13,1,3,'fur-d')}</g>
+      <g class="tail-b">${r(18,18,2,1,'fur-d')}${r(20,16,1,3,'fur-d')}${r(21,15,1,2,'fur-d')}${r(22,13,1,3,'fur-d')}</g>
+      <g class="tail-up">${r(18,18,1,1,'fur-d')}${r(19,10,1,9,'fur-d')}${r(20,9,1,2,'fur-d')}</g>
+      ${r(6,13,12,7,'fur')}${r(9,15,6,5,'fur-l')}${r(7,20,3,1,'fur-l')}${r(14,20,3,1,'fur-l')}
+      <g class="upper">
+        <g class="ears" data-ears>${r(5,3,1,1,'fur')}${r(5,4,2,1,'fur')}${r(5,5,3,1,'fur')}${r(6,5,1,1,'nose')}${r(18,3,1,1,'fur')}${r(17,4,2,1,'fur')}${r(16,5,3,1,'fur')}${r(17,5,1,1,'nose')}</g>
+        ${r(5,6,14,7,'fur')}${r(5,12,14,1,'fur-d')}
+        ${r(2,10,3,1,'whisk')}${r(2,8,3,1,'whisk')}${r(19,10,3,1,'whisk')}${r(19,8,3,1,'whisk')}
+        <g class="eyes-open">${r(8,8,2,2,'iris')}${r(14,8,2,2,'iris')}<g data-pupils>${r(8,8,1,2,'pupil')}${r(14,8,1,2,'pupil')}</g></g>
+        <g class="eye-happy">${r(8,9,1,1,'pupil')}${r(9,8,1,1,'pupil')}${r(10,9,1,1,'pupil')}${r(13,9,1,1,'pupil')}${r(14,8,1,1,'pupil')}${r(15,9,1,1,'pupil')}</g>
+        <g class="eye-shut">${r(8,9,2,1,'pupil')}${r(14,9,2,1,'pupil')}</g>
+        ${r(11,10,2,1,'nose')}
+      </g>
+      ${r(6,13,12,1,'collar')}${leds}
+      <g class="fx fx-ask">${ask(17,-3)}</g>
+      <g class="fx fx-bang">${rf(20,0,2,5,'#F87171')}${rf(20,6,2,2,'#F87171')}</g>
+      <g class="fx fx-zz">${zz(18,0)}</g></g>`;
+  }
+  function ledMarkup(ids) {
+    const n = ids.length, start = 12 - n;
+    return ids.map((id, i) => `<rect data-led="${id}" x="${start + i * 2}" y="14" width="1" height="1" fill="#3A4256"/>`).join('');
+  }
+
+  let uidSeq = 0;
+  const pets = new Set();      // mascotas registradas en el bucle de mirada y variaciones
+  /** Crea una mascota envuelta. La capa .pet lleva el subestado; .pet-var recibe las variaciones; .pet-body el movimiento CSS. */
+  function makePet(id, { live: isLive = true } = {}) {
+    const a = AGENTS[id], uid = `${a.kind}-g-${uidSeq++}`;
+    const wrap = document.createElement('span');
+    wrap.className = 'pet'; wrap.dataset.family = a.kind === 'chispa' ? 'px' : 'flat';
+    wrap.innerHTML = `<span class="pet-var"><span class="pet-body">${SVG[a.kind](uid)}</span></span>`;
+    const svg = wrap.querySelector('svg');
+    const p = { id, kind: a.kind, el: wrap, svg, varEl: wrap.querySelector('.pet-var'), look: svg.querySelector('[data-look]'), face: svg.querySelector('.face'),
+      gx: 0, gy: 0, glance: null, nextVar: 0, isLive };
+    if (isLive) pets.add(p);
+    return p;
+  }
+  function paintPet(p, state, activity) {
+    p.svg.dataset.state = state;
+    p.el.dataset.activity = activity || '';
+    p.svg.setAttribute('aria-hidden', 'true');
+  }
+  const unregister = (root) => { for (const p of [...pets]) if (root.contains(p.el)) pets.delete(p); };
+
+  /* ---------- utilidades de texto ---------- */
+  const mid = (s, max) => s.length <= max ? s : s.slice(0, Math.ceil(max * .35)) + '…' + s.slice(s.length - Math.floor(max * .65) + 1);
+  const dur = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); if (s < 60) return `${s} s`; const m = Math.floor(s / 60); if (m < 60) return `${m} min ${String(s % 60).padStart(2, '0')} s`; return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`; };
+  const clock = (t) => new Date(t).toTimeString().slice(0, 8);
+  const actLabel = (id) => actOf(id) ? ACT[actOf(id)][1] : LABEL[stateOf(id)];
+  const shortLabel = (id) => actOf(id) ? ACT[actOf(id)][2] : SHORT[stateOf(id)];
+  const ariaFor = (id) => `${AGENTS[id].mascot}, ${AGENTS[id].name}: ${actLabel(id).toLowerCase()}`;
+
+  /* ---------- dock ---------- */
+  const dock = $('dock'), flyout = $('flyout');
+  const slots = {};
+  let focusIdx = 0, openId = null, eventsOpen = false;
+  const GEAR = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>';
+
+  function renderDock() {
+    unregister(dock); dock.innerHTML = ''; for (const k in slots) delete slots[k];
+    dock.dataset.size = prefs.dockSize;
+    const vis = dockVisible();
+    if (!vis.length) {
+      const p = document.createElement('p'); p.className = 'dock-empty';
+      p.textContent = prefs.detected ? 'Ninguna mascota en el dock. Actívalas en Ajustes.' : 'Ningún agente detectado.';
+      dock.append(p);
+    }
+    vis.forEach((id, i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'slot'; b.id = `slot-${id}`; b.dataset.agent = id;
+      b.style.setProperty('--accent', COLOR[id]);
+      b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-controls', 'flyout'); b.setAttribute('aria-haspopup', 'dialog');
+      b.innerHTML = `<span class="orbit"><svg class="tring" viewBox="0 0 48 48" aria-hidden="true"><circle class="track" cx="24" cy="24" r="22" pathLength="100"/><circle class="fill" cx="24" cy="24" r="22" pathLength="100"/></svg></span>
+        <span class="badge" aria-hidden="true"></span><span class="slot-label" aria-hidden="true"><i></i><span></span></span><span class="tip" aria-hidden="true">${AGENTS[id].name}</span>`;
+      const pet = makePet(id); b.querySelector('.orbit').append(pet.el);
+      b.addEventListener('click', () => toggleFly(id));
+      slots[id] = { el: b, pet, fill: b.querySelector('.tring .fill'), badge: b.querySelector('.badge'), label: b.querySelector('.slot-label span') };
+      paintSlot(id);
+      dock.append(b);
+    });
+    const sep = document.createElement('span'); sep.className = 'dock-sep'; sep.setAttribute('aria-hidden', 'true');
+    const gear = document.createElement('button');
+    gear.type = 'button'; gear.className = 'icon-btn dock-gear'; gear.setAttribute('aria-label', 'Ajustes de vista'); gear.innerHTML = GEAR;
+    gear.addEventListener('click', () => openSettings(gear));
+    dock.append(sep, gear);
+    focusIdx = Math.min(focusIdx, dock.querySelectorAll('.slot, .dock-gear').length - 1);
+    roving();
+    if (openId && !vis.includes(openId)) closeFly(false);
+    else if (openId) { slots[openId].el.setAttribute('aria-expanded', 'true'); positionFly(); }
+  }
+  function paintSlot(id) {
+    const s = slots[id]; if (!s) return;
+    const st = stateOf(id), act = actOf(id);
+    s.el.dataset.state = st;
+    s.el.setAttribute('aria-label', ariaFor(id));
+    paintPet(s.pet, st, act);
+    if (s.badge.dataset.a !== (act || '')) { s.badge.dataset.a = act || ''; s.badge.innerHTML = badgeSvg(act); }
+    s.label.textContent = shortLabel(id);
+  }
+  function roving() {
+    const items = [...dock.querySelectorAll('.slot, .dock-gear')];
+    items.forEach((el, i) => el.tabIndex = i === focusIdx ? 0 : -1);
+  }
+  dock.addEventListener('keydown', (e) => {
+    const items = [...dock.querySelectorAll('.slot, .dock-gear')];
+    const i = items.indexOf(document.activeElement); if (i < 0) return;
+    let n = null;
+    if (e.key === 'ArrowRight') n = (i + 1) % items.length;
+    else if (e.key === 'ArrowLeft') n = (i - 1 + items.length) % items.length;
+    else if (e.key === 'Home') n = 0;
+    else if (e.key === 'End') n = items.length - 1;
+    if (n == null) return;
+    e.preventDefault(); focusIdx = n; roving(); items[n].focus();
+  });
+  dock.addEventListener('focusin', (e) => { const items = [...dock.querySelectorAll('.slot, .dock-gear')]; const i = items.indexOf(e.target); if (i >= 0) { focusIdx = i; roving(); } });
+
+  /* ---------- flyout ---------- */
+  function toggleFly(id) { if (openId === id) closeFly(true); else openFly(id); }
+  function openFly(id) {
+    if (openId) slots[openId]?.el.setAttribute('aria-expanded', 'false');
+    openId = id; eventsOpen = false;
+    slots[id].el.setAttribute('aria-expanded', 'true');
+    document.body.classList.add('flyout-open');
+    flyout.style.setProperty('--accent', COLOR[id]);
+    flyout.innerHTML = `
+      <div class="fly-head"><div><h2 id="flyTitle">${AGENTS[id].name}</h2><span class="sub" data-f="sub"></span></div><span class="pill" data-f="pill"><i></i><span></span></span></div>
+      <div class="fly-now">
+        <div class="fly-act"><span class="badge-lg" data-f="badge" aria-hidden="true"></span><div><b data-f="act"></b><span class="tool" data-f="tool"></span></div></div>
+        <div class="target" data-f="target"><span class="kind" data-f="kind"></span><code data-f="code"></code></div>
+      </div>
+      <dl class="times"><div><dt>Sesión</dt><dd data-f="session"></dd></div><div><dt>En este estado</dt><dd data-f="since"></dd></div><div><dt>Herramientas</dt><dd data-f="tools"></dd></div></dl>
+      <div><span class="group-label">Últimos eventos</span><ol class="recent" data-f="recent"></ol></div>
+      <div class="fly-foot"><button class="btn primary" type="button" data-f="events" aria-expanded="false" aria-controls="flyEvents">Ver eventos</button><button class="btn" type="button" data-f="close">Cerrar</button></div>
+      <div class="events" id="flyEvents" hidden><span class="group-label">Eventos de ${AGENTS[id].name} · datos de ejemplo</span><ol class="recent" data-f="all"></ol></div>`;
+    flyout.hidden = false;
+    flyout.querySelector('[data-f="close"]').addEventListener('click', () => closeFly(true));
+    flyout.querySelector('[data-f="events"]').addEventListener('click', (e) => {
+      eventsOpen = !eventsOpen; e.currentTarget.setAttribute('aria-expanded', String(eventsOpen));
+      e.currentTarget.textContent = eventsOpen ? 'Ocultar eventos' : 'Ver eventos';
+      $('flyEvents').hidden = !eventsOpen; paintFly(true); positionFly();
+    });
+    paintFly(true); positionFly();
+  }
+  function closeFly(returnFocus) {
+    if (!openId) return;
+    const id = openId; openId = null;
+    flyout.hidden = true; flyout.innerHTML = '';
+    document.body.classList.remove('flyout-open');
+    if (slots[id]) { slots[id].el.setAttribute('aria-expanded', 'false'); if (returnFocus) slots[id].el.focus(); }
+  }
+  function positionFly() {
+    if (!openId || !slots[openId]) return;
+    const sb = slots[openId].el.getBoundingClientRect(), db = dock.getBoundingClientRect();
+    const w = flyout.offsetWidth, cx = sb.left + sb.width / 2;
+    const left = Math.max(16, Math.min(innerWidth - 16 - w, cx - w / 2));
+    flyout.style.left = `${left}px`; flyout.style.top = `${db.bottom + 12}px`;
+    flyout.style.setProperty('--caret', `${Math.max(20, Math.min(w - 20, cx - left))}px`);
+    flyout.style.maxHeight = `${innerHeight - db.bottom - 28}px`; flyout.style.overflow = 'auto';
+  }
+  const q = (f) => flyout.querySelector(`[data-f="${f}"]`);
+  function paintFly(full) {
+    if (!openId) return;
+    const id = openId, L = live[id], [st, act, tool, kind, text] = entryOf(id), now = Date.now();
+    if (full) {
+      q('sub').textContent = `${AGENTS[id].mascot} · sesión ${id.slice(0, 2)}${(L.sessionStart % 9973).toString(16)}`;
+      const pill = q('pill'); pill.dataset.s = st; pill.lastElementChild.textContent = LABEL[st];
+      const bd = q('badge'); if (bd.dataset.a !== (act || '')) { bd.dataset.a = act || ''; bd.innerHTML = badgeSvg(act); }
+      q('act').textContent = actLabel(id);
+      q('tool').textContent = tool === '—' ? '' : tool;
+      q('target').hidden = !text;
+      q('kind').textContent = kind ? KIND[kind].toUpperCase() : 'DETALLE';
+      q('code').textContent = kind === 'file' ? mid(text, 52) : text; q('code').title = text;
+      q('tools').textContent = String(L.tools);
+      const rows = (n) => L.log.slice(-n).reverse().map(({ at, entry }) => `<li><time>${clock(at)}</time><span>${(entry[1] ? ACT[entry[1]][1] : LABEL[entry[0]])}${entry[4] ? ` · <code class="mono">${escapeHtml(entry[3] === 'file' ? mid(entry[4], 46) : entry[4])}</code>` : ''}</span></li>`).join('');
+      q('recent').innerHTML = rows(3);
+      if (eventsOpen) q('all').innerHTML = rows(12);
+    }
+    q('session').textContent = dur(now - L.sessionStart);
+    q('since').textContent = dur(now - L.since);
+  }
+  const escapeHtml = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  flyout.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeFly(true); } });
+  dock.addEventListener('keydown', (e) => { if (e.key === 'Escape' && openId) closeFly(true); });
+  document.addEventListener('pointerdown', (e) => { if (openId && !flyout.contains(e.target) && !dock.contains(e.target)) closeFly(false); });
+  addEventListener('resize', positionFly);
+
+  /* ---------- cabinas (resumen) ---------- */
+  const cabins = {};
+  function renderCabins() {
+    const root = $('cabins'); unregister(root); root.innerHTML = ''; for (const k in cabins) delete cabins[k];
+    if (prefs.viewMode !== 'cabins') return;
+    for (const id of cabinVisible()) {
+      const c = document.createElement('article'); c.className = 'cabin'; c.style.setProperty('--accent', COLOR[id]);
+      c.innerHTML = `<div class="cabin-head"><div><h3>${AGENTS[id].name}</h3><span>mascota: ${AGENTS[id].mascot}</span></div><span class="pill"><i></i><span></span></span></div>
+        <div class="cabin-stage"><span class="badge" aria-hidden="true"></span></div>
+        <div class="target"><b class="act"></b><span class="kind"></span><code></code></div><div class="meta"><span data-c="since"></span><span data-c="session"></span></div>`;
+      const pet = makePet(id); c.querySelector('.cabin-stage').prepend(pet.el);
+      pet.svg.removeAttribute('aria-hidden');
+      cabins[id] = { el: c, pet };
+      root.append(c); paintCabin(id);
+    }
+  }
+  function paintCabin(id) {
+    const c = cabins[id]; if (!c) return;
+    const [st, act, tool, kind, text] = entryOf(id);
+    paintPet(c.pet, st, act); c.pet.svg.removeAttribute('aria-hidden'); c.pet.svg.setAttribute('aria-label', ariaFor(id));
+    const pill = c.el.querySelector('.pill'); pill.dataset.s = st; pill.lastElementChild.textContent = LABEL[st];
+    c.el.querySelector('.act').textContent = actLabel(id);
+    const bd = c.el.querySelector('.badge'); if (bd.dataset.a !== (act || '')) { bd.dataset.a = act || ''; bd.innerHTML = badgeSvg(act); }
+    c.el.querySelector('.kind').textContent = `${kind ? KIND[kind].toUpperCase() : 'DETALLE'}${tool !== '—' ? ' · ' + tool : ''}`;
+    c.el.querySelector('code').textContent = text || '—'; c.el.querySelector('code').title = text || '';
+  }
+
+  /* ---------- catálogo ---------- */
+  let catId = 'claude';
+  function renderCatPick() {
+    $('catPick').innerHTML = IDS.map((id) => `<button type="button" data-id="${id}" aria-pressed="${id === catId}">${AGENTS[id].mascot}</button>`).join('');
+  }
+  $('catPick').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; catId = b.dataset.id; renderCatPick(); renderCatalog(); });
+  function renderCatalog() {
+    const root = $('catalog'); unregister(root); root.innerHTML = '';
+    for (const [a, [base, long, short, rule]] of Object.entries(ACT)) {
+      const t = document.createElement('div'); t.className = 'tile'; t.style.setProperty('--accent', COLOR[catId]);
+      t.innerHTML = `<div class="tile-stage"><span class="badge" aria-hidden="true">${badgeSvg(a)}</span></div><span class="code">${a} · ${short}</span><b>${long}</b><p>${LABEL[base]} · ${rule}</p>`;
+      const pet = makePet(catId, { live: false }); paintPet(pet, base, a);
+      pet.svg.removeAttribute('aria-hidden'); pet.svg.setAttribute('aria-label', `${AGENTS[catId].mascot}: ${long.toLowerCase()}`);
+      t.querySelector('.tile-stage').prepend(pet.el);
+      root.append(t);
+    }
+  }
+
+  /* ---------- Michi en ajustes ---------- */
+  const michiSet = $('michiSet');
+  function mood() {
+    const vis = dockVisible(); if (!vis.length) return 'alone';
+    const ss = vis.map(stateOf);
+    if (ss.includes('error')) return 'alarm';
+    if (ss.includes('permission')) return 'alert';
+    if (ss.some((s) => ACTIVE.has(s))) return 'watching';
+    if (ss.includes('done')) return 'happy';
+    if (ss.every((s) => s === 'sleeping')) return 'sleeping';
+    return 'watching';
+  }
+  const MOOD = { alone: 'sin agentes, dormido', alarm: 'alarmado: un agente tiene un error', alert: 'alerta: un agente pide permiso', watching: 'vigilando', happy: 'contento: un agente terminó', sleeping: 'dormido' };
+  function syncMichi(rebuild) {
+    if (rebuild) michiSet.innerHTML = michiMarkup(ledMarkup(dockVisible()));
+    const m = mood(); michiSet.dataset.mood = m; michiSet.setAttribute('aria-label', `Michi, ${MOOD[m]}`);
+    const led = (s) => s === 'error' ? '#F87171' : s === 'permission' ? '#FBBF24' : ACTIVE.has(s) || s === 'done' ? null : '#3A4256';
+    michiSet.querySelectorAll('[data-led]').forEach((n) => n.setAttribute('fill', led(stateOf(n.dataset.led)) || COLOR[n.dataset.led]));
+  }
+
+  /* ---------- ajustes ---------- */
+  const dlg = $('settings');
+  let opener = null;
+  const ICON = {
+    grip: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>',
+    up: '<svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg>', down: '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>',
+  };
+  function openSettings(from) { opener = from; renderSettings(); dlg.showModal(); }
+  dlg.addEventListener('close', () => { opener?.focus(); });
+  function renderSettings() {
+    syncMichi(true);
+    $('setView').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === prefs.viewMode)));
+    $('setSize').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.size === prefs.dockSize)));
+    $('setDetected').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.n) === prefs.detected)));
+    const list = $('setAgents'); list.innerHTML = '';
+    prefs.agentOrder.forEach((id, i) => {
+      const a = AGENTS[id], det = detected(id), on = det && !prefs.dockHiddenAgents.includes(id);
+      const li = document.createElement('li'); li.className = 'agent-row'; li.dataset.id = id; li.dataset.detected = String(det); li.style.setProperty('--accent', COLOR[id]);
+      li.innerHTML = `<button type="button" class="grip" aria-label="Arrastrar ${a.name} para reordenar" tabindex="-1">${ICON.grip}</button><span class="mini"></span>
+        <span class="who"><b>${a.name}</b><span>${a.mascot}${det ? '' : ' · no detectado'}</span></span>
+        <label class="switch" title="${det ? 'Mostrar en el dock' : 'No detectado en este equipo'}"><input type="checkbox" role="switch" ${on ? 'checked' : ''} ${det ? '' : 'disabled'} aria-label="Mostrar ${a.mascot} en el dock"><span></span></label>
+        <span class="moves"><button type="button" class="icon-btn" data-m="-1" aria-label="Subir ${a.name}" ${i === 0 ? 'disabled' : ''}>${ICON.up}</button><button type="button" class="icon-btn" data-m="1" aria-label="Bajar ${a.name}" ${i === 3 ? 'disabled' : ''}>${ICON.down}</button></span>`;
+      const mini = makePet(id, { live: false }); paintPet(mini, 'idle', null); mini.el.classList.add('calm'); li.querySelector('.mini').append(mini.el);
+      li.querySelector('input').addEventListener('change', (e) => {
+        prefs.dockHiddenAgents = e.target.checked ? prefs.dockHiddenAgents.filter((x) => x !== id) : [...prefs.dockHiddenAgents, id];
+        commit(); announce(`${a.mascot} ${e.target.checked ? 'visible' : 'oculto'} en el dock.`); syncMichi(true);
+      });
+      li.querySelectorAll('[data-m]').forEach((b) => b.addEventListener('click', () => moveAgent(id, Number(b.dataset.m), true)));
+      const grip = li.querySelector('.grip');
+      grip.addEventListener('pointerdown', () => { li.draggable = true; });
+      li.addEventListener('dragstart', (e) => { li.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id); });
+      li.addEventListener('dragend', () => { li.draggable = false; li.classList.remove('dragging'); list.querySelectorAll('.drop-target').forEach((n) => n.classList.remove('drop-target')); });
+      li.addEventListener('dragover', (e) => { e.preventDefault(); li.classList.add('drop-target'); });
+      li.addEventListener('dragleave', () => li.classList.remove('drop-target'));
+      li.addEventListener('drop', (e) => { e.preventDefault(); const from = e.dataTransfer.getData('text/plain'); if (from && from !== id) placeBefore(from, id); });
+      list.append(li);
+    });
+  }
+  function moveAgent(id, dir, keepFocus) {
+    const o = prefs.agentOrder, i = o.indexOf(id), j = i + dir;
+    if (j < 0 || j >= o.length) return;
+    [o[i], o[j]] = [o[j], o[i]];
+    commit(); renderSettings();
+    announce(`${AGENTS[id].name}: posición ${j + 1} de ${o.length}.`);
+    if (keepFocus) { const b = $('setAgents').querySelector(`[data-id="${id}"] [data-m="${dir}"]`); (b && !b.disabled ? b : $('setAgents').querySelector(`[data-id="${id}"] [data-m="${-dir}"]`))?.focus(); }
+  }
+  function placeBefore(from, to) {
+    const o = prefs.agentOrder.filter((x) => x !== from); o.splice(o.indexOf(to), 0, from); prefs.agentOrder = o;
+    commit(); renderSettings(); announce(`${AGENTS[from].name}: posición ${o.indexOf(from) + 1} de ${o.length}.`);
+  }
+  $('setView').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; prefs.viewMode = b.dataset.view; closeFly(false); commit(); renderSettings(); announce(prefs.viewMode === 'dock' ? 'Vista: dock superior.' : 'Vista: cabinas.'); });
+  $('setSize').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; prefs.dockSize = b.dataset.size; commit(); renderSettings(); });
+  $('setDetected').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; prefs.detected = Number(b.dataset.n); commit(); renderSettings(); });
+  $('openSettings').addEventListener('click', (e) => openSettings(e.currentTarget));
+
+  function commit() {
+    save();
+    document.body.dataset.view = prefs.viewMode;
+    renderDock(); renderCabins();
+    $('saved').textContent = `Guardado ${clock(Date.now())} en este navegador · en la app: PUT /api/preferences`;
+  }
+
+  /* ---------- simulación ---------- */
+  function advance(id) {
+    const L = live[id], prev = entryOf(id);
+    L.step = (L.step + 1) % SCRIPT[id].length;
+    const next = entryOf(id);
+    if (next[0] !== prev[0] || next[1] !== prev[1]) L.since = Date.now();
+    if (next[0] !== 'idle' && next[0] !== 'sleeping' && next[2] !== '—') L.tools++;
+    L.log.push({ at: Date.now(), entry: next }); if (L.log.length > 40) L.log.shift();
+    paintSlot(id); paintCabin(id); syncMichi(false);
+    if (openId === id) paintFly(true);
+    const st = next[0];
+    if ((st === 'permission' || st === 'done' || st === 'error') && (dockVisible().includes(id) || prefs.viewMode === 'cabins')) announce(`${AGENTS[id].name}: ${LABEL[st].toLowerCase()}.`);
+  }
+  let auto = true, autoTimer = 0, rr = 0;
+  const schedule = () => { clearTimeout(autoTimer); if (auto) autoTimer = setTimeout(() => { const vis = IDS.filter(detected); if (vis.length) advance(vis[rr++ % vis.length]); schedule(); }, 2600); };
+  $('autoplay').addEventListener('click', (e) => { auto = !auto; e.currentTarget.setAttribute('aria-pressed', String(auto)); e.currentTarget.textContent = auto ? 'Simulación en marcha' : 'Simulación en pausa'; schedule(); });
+
+  /* ---------- un solo bucle: mirada, anillos, relojes y variaciones ---------- */
+  const pointer = { x: innerWidth / 2, y: 0, t: -1e9 };
+  addEventListener('pointermove', (e) => { pointer.x = e.clientX; pointer.y = e.clientY; pointer.t = performance.now(); }, { passive: true });
+  const LOOK = { nodo: [6, 5, 6, '60px 60px'], astro: [5, 4, 6, '60px 62px'], hondo: [3, 3, 4, '68px 66px'] };
+  const VARIANTS = {
+    stretch: [{ transform: 'scale(1, 1)' }, { transform: 'scale(.96, 1.07)' }, { transform: 'scale(1, 1)' }],
+    shuffle: [{ transform: 'translateX(0)' }, { transform: 'translateX(-6%)' }, { transform: 'translateX(4%)' }, { transform: 'translateX(0)' }],
+    glance: null,
+  };
+  let raf = 0, last4 = 0, last1 = 0;
+  const moving = () => !calm && !reduced();
+  function frame(t) {
+    raf = 0;
+    if (document.hidden) return;
+    const now = Date.now();
+    if (moving()) {
+      for (const p of pets) {
+        if (!p.look || !p.isLive) continue;
+        const st = stateOf(p.id), b = p.svg.getBoundingClientRect();
+        if (!b.width) continue;
+        const cx = b.left + b.width / 2, cy = b.top + b.height * .45;
+        let tx = pointer.x, ty = pointer.y;
+        if (p.glance && t < p.glance.until) { tx = cx + p.glance.dx * 200; ty = cy + p.glance.dy * 120; }
+        const dx = tx - cx, dy = ty - cy, d = Math.hypot(dx, dy) || 1, m = Math.min(1, d / (b.width * 3));
+        let ux = (dx / d) * m, uy = (dy / d) * m;
+        if (st === 'sleeping' || t - pointer.t > 4500 && !(p.glance && t < p.glance.until)) { ux = 0; uy = 0; }
+        p.gx += (ux - p.gx) * .18; p.gy += (uy - p.gy) * .18;
+        if (p.kind === 'chispa') p.look.setAttribute('transform', `translate(${Math.round(p.gx * 1.4)} ${Math.round(p.gy * 1.4)})`);
+        else {
+          const [fx, fy, rot, origin] = LOOK[p.kind];
+          p.face.setAttribute('transform', `translate(${(p.gx * fx).toFixed(1)} ${(p.gy * fy).toFixed(1)})`);
+          p.look.style.transformOrigin = origin;
+          p.look.style.transform = `rotate(${((p.kind === 'hondo' ? p.gy : p.gx) * rot).toFixed(1)}deg)`;
+        }
+        // variaciones por permanencia: tras 20 s en el mismo subestado, una cada 6–11 s
+        const L = live[p.id];
+        if (now - L.since >= 20000 && ACTIVE.has(st) && st !== 'permission') {
+          if (!p.nextVar) p.nextVar = t + 6000 + Math.random() * 5000;
+          else if (t >= p.nextVar) {
+            p.nextVar = t + 6000 + Math.random() * 5000;
+            const keys = Object.keys(VARIANTS), k = keys[Math.floor(Math.random() * keys.length)];
+            if (k === 'glance') p.glance = { until: t + 1400, dx: Math.random() < .5 ? -1 : 1, dy: -.3 };
+            else { const anim = p.varEl.animate(VARIANTS[k], { duration: p.kind === 'chispa' ? 480 : 560, easing: p.kind === 'chispa' ? 'steps(3)' : 'cubic-bezier(.3,1.5,.5,1)' }); anim.onfinish = () => anim.cancel(); }
+          }
+        } else p.nextVar = 0;
+      }
+    }
+    if (t - last4 >= 250) {
+      last4 = t;
+      for (const id in slots) {
+        const st = stateOf(id), el = slots[id].fill;
+        const frac = (st === 'permission' || st === 'error') ? 1 : ((now - live[id].since) % 60000) / 60000;
+        el.style.strokeDashoffset = String(100 - frac * 100);
+      }
+    }
+    if (t - last1 >= 1000) {
+      last1 = t;
+      paintFly(false);
+      for (const id in cabins) {
+        const c = cabins[id].el;
+        c.querySelector('[data-c="since"]').textContent = `en este estado ${dur(now - live[id].since)}`;
+        c.querySelector('[data-c="session"]').textContent = `sesión ${dur(now - live[id].sessionStart)}`;
+      }
+    }
+    start();
+  }
+  function start() { if (!raf && !document.hidden) raf = requestAnimationFrame(frame); }
+  document.addEventListener('visibilitychange', start);
+
+  function applyCalm() {
+    document.documentElement.classList.toggle('calm', calm);
+    $('calmBtn').setAttribute('aria-pressed', String(calm));
+    if (!moving()) for (const p of pets) {
+      p.gx = p.gy = 0; p.glance = null;
+      if (p.look && p.kind === 'chispa') p.look.removeAttribute('transform');
+      else if (p.look) { p.look.style.transform = ''; p.face.removeAttribute('transform'); }
+    }
+  }
+  $('calmBtn').addEventListener('click', () => { calm = !calm; applyCalm(); announce(calm ? 'Modo calma activado.' : 'Modo calma desactivado.'); });
+  matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', applyCalm);
+
+  /* ---------- arranque ---------- */
+  document.body.dataset.view = prefs.viewMode;
+  renderDock(); renderCabins(); renderCatPick(); renderCatalog(); syncMichi(true); applyCalm();
+  schedule(); start();
+})();
+</script>
+</body>
+</html>

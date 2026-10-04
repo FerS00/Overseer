@@ -267,3 +267,48 @@ Nada de rasgos infantiles (rubor, sonrisas, gotas decorativas, ojos con brillo).
 | 375 px | No verificado en esta revisión: el emulador del panel no aplicó el ancho real. Pendiente en la fase 15 con Playwright. |
 | Vigía | Se retira de la interfaz en la fase 14; su especificación de la revisión 3 se conserva arriba como histórico. |
 | Chispa y Nodo de la revisión 3 | Sustituidas por los rediseños 4c; las secciones anteriores quedan como histórico. |
+
+---
+
+## Revisión 5 (propuesta, pendiente de aprobación, 2026-10-04)
+
+Petición del usuario: una vista compacta de escritorio anclada arriba que muestre solo las mascotas, un panel por agente con la tarea exacta, subestados para que las tareas largas no se vean iguales y un panel para gestionar visibilidad, orden y vista. Plan técnico y criterios de aceptación: `docs/PLAN_PROYECTO.md` (fases 17–23). Prototipo: `prototype-desktop.html`. Las mascotas, sus nueve estados y los tokens de la revisión 4 no cambian.
+
+### Dock superior
+
+- Barra fija arriba y centrada, fondo `rgba(17,21,31,.88)` con desenfoque, borde `--line`, radio 24 px; única sombra nueva, justificada porque flota sobre otras ventanas.
+- Una ranura por mascota visible en el orden de `agentOrder`, más un botón de ajustes separado por un filete.
+- Ranura: mascota a 40 px (30 px en compacto) dentro de un **anillo de tiempo** que se llena en 60 s en el mismo estado y reinicia; ámbar y pulsante en permiso, rojo en error, oculto en espera y durmiendo. Debajo, punto semántico y etiqueta corta en mono (`TESTS`, `LOTE`, `PERMISO`…). Insignia de subestado de 20 px arriba a la derecha.
+- `role="toolbar"` con foco itinerante (`←/→/Inicio/Fin`); cada ranura es un botón con `aria-expanded` y `aria-label` «Mascota, agente: subestado».
+- Por debajo de 480 px la ranura baja a 54/46 px; cuatro ranuras y el botón de ajustes caben a 375 px.
+
+### Flyout de agente
+
+- Panel no modal (`role="dialog"`, `aria-modal="false"`) de 368 px como máximo, anclado bajo la ranura con una flecha y ajustado al viewport con 16 px de margen. La ranura activa sube 2 px y escala a 1,06 con borde del color del agente.
+- Contenido: nombre (color del agente), mascota y sesión; píldora de estado; bloque «Ahora» con insignia grande, subestado, herramienta y objetivo exacto (archivo, archivos, árbol, URL, comando o subagentes; rutas largas recortadas por el centro); duración de la sesión, tiempo en el estado y herramientas; tres últimos eventos.
+- Acciones: «Ver eventos» (despliega la lista del agente en el propio flyout) y «Cerrar». `Esc` cierra y devuelve el foco a la ranura; un clic fuera cierra sin mover el foco. Cerrar no altera la geometría de la barra.
+
+### Subestados
+
+| Estado | Subestados | Insignia | Movimiento del contenedor |
+|---|---|---|---|
+| leyendo | `read.file` · `read.batch` · `read.tree` · `read.web` | lupa que recorre · hojas que pasan · nodos que se encienden · globo que gira | ninguno · barrido lateral · asentimiento · mirada arriba |
+| editando | `edit.file` · `edit.multi` | lápiz y línea que crece · lápiz que salta entre dos documentos | ninguno · paso lateral |
+| ejecutando | `run.shell` · `run.test` · `run.build` · `run.install` · `run.net` · `run.wait` | `>_` · tres casillas que pasan a verde · bloques que se apilan · caja con flecha · ondas · reloj de arena con satélites | ninguno · salto corto por prueba · golpe de compresión · hundimiento · pulso · balanceo lento con la animación propia en pausa |
+
+- El movimiento se aplica a un envoltorio de la mascota, nunca a su SVG; desplazamientos ≤ 7 % del tamaño. Chispa y Michi usan `steps()` para conservar el movimiento por celdas.
+- **Variaciones por permanencia:** tras 20 s en el mismo subestado activo, cada 6–11 s una de tres (mirar a un lado, estirarse, reacomodarse). No se aplican en permiso.
+- Calma y `prefers-reduced-motion`: insignias estáticas, sin movimiento del contenedor, sin variaciones y sin anillo animado.
+
+### Panel de ajustes
+
+- `<dialog>` modal con Michi en la cabecera (collar con una luz por agente visible en el dock).
+- Secciones: Vista (Dock superior / Cabinas), Agentes y orden (asa de arrastre, mascota estática, nombre, interruptor «Mostrar en el dock», Subir/Bajar), Tamaño del dock (Normal / Compacto). Un agente no detectado aparece atenuado con el interruptor deshabilitado.
+- El orden es común a ambas vistas; el interruptor solo afecta al dock. Cada movimiento se anuncia con la nueva posición.
+
+### Pendientes
+
+| Punto | Detalle |
+|---|---|
+| Aprobación | El usuario debe aprobar el prototipo antes de la fase 17. |
+| Ventana nativa | Una ventana de escritorio siempre visible queda fuera de esta revisión. |
