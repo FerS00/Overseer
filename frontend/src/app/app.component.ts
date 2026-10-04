@@ -8,10 +8,11 @@ import { AgentEvent, AgentSession, AgentState } from './models';
 import { AGENT_PROFILES, AgentMeta } from './agent-profiles';
 import { AstroComponent, ChispaComponent, HondoComponent, MichiComponent, NodoComponent } from './mascots/mascot-components';
 import { MascotEngine } from './mascots/mascot-engine.service';
-import { compareEventRecency, MascotState, MASCOT_STATES, MASCOT_STATE_LABELS } from './mascots/mascot-state';
+import { compareEventRecency, MascotState, MASCOT_STATES, MASCOT_STATE_LABELS, michiState as summarizeMichi } from './mascots/mascot-state';
 import { MascotHandoff, MascotStateService } from './mascots/mascot-state.service';
 import { PreferencesService, ViewPreferences } from './preferences.service';
 import { DockBarComponent } from './dock/dock-bar.component';
+import { ViewSettingsComponent } from './dock/view-settings.component';
 import { ActivityBadgeComponent } from './dock/activity-badge.component';
 import { DockAgent, activityLabel } from './dock/dock.models';
 const EVENT_TYPES = ['session_start', 'user_prompt', 'thinking', 'message', 'tool_use', 'tool_result', 'handoff', 'turn_end', 'session_end', 'error', 'permission_request', 'note'] as const;
@@ -27,7 +28,7 @@ const OVERSCAN = 8;
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [MichiComponent, ChispaComponent, NodoComponent, AstroComponent, HondoComponent, JsonPipe, DockBarComponent, ActivityBadgeComponent],
+  imports: [MichiComponent, ChispaComponent, NodoComponent, AstroComponent, HondoComponent, JsonPipe, DockBarComponent, ViewSettingsComponent, ActivityBadgeComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app.component.html',
   host: { '[class.calm-mode]': 'mascotEngine.calm()' },
@@ -109,6 +110,9 @@ export class AppComponent implements OnInit, OnDestroy {
       };
     });
   });
+  readonly dockIndicators = computed(() => this.dockProfiles().map((profile) => ({ id: profile.id, color: profile.color, state: this.mascotStateFor(profile.id) })));
+  readonly dockMichi = computed<MascotState>(() => summarizeMichi(Object.fromEntries(this.dockProfiles().map((profile) => [profile.id, this.mascotStateFor(profile.id)]))));
+  private readonly settings = viewChild(ViewSettingsComponent);
   private readonly viewport = viewChild<ElementRef<HTMLElement>>('eventViewport');
   private readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
   private readonly detailPanel = viewChild<ElementRef<HTMLElement>>('detailPanel');
@@ -462,12 +466,12 @@ export class AppComponent implements OnInit, OnDestroy {
     this.preferences.update((value) => ({ ...value, [key]: (event.target as HTMLSelectElement).value })); await this.savePreferences();
   }
   async updateFocus(event: Event): Promise<void> { this.preferences.update((value) => ({ ...value, focusAgent: (event.target as HTMLSelectElement).value })); await this.savePreferences(); }
-  /** The view settings dialog arrives in the next change; until then the dock offers a way back to the cabins. */
-  openSettings(): void { void this.applyPreferences({ viewMode: 'cabins' }); }
+  openSettings(opener?: HTMLElement | null): void { this.settings()?.open(opener); }
   async applyPreferences(patch: Partial<ViewPreferences>): Promise<void> {
     if (patch.viewMode) this.viewOverride.set(null);
     await this.prefs.update(patch);
   }
+  setCalm(enabled: boolean): void { this.mascotEngine.setCalm(enabled); }
   openTimelineFor(agent: string): void {
     this.viewOverride.set('cabins');
     this.agentFilter.set(agent); this.sessionFilter.set('all');

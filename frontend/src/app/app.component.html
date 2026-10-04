@@ -1,7 +1,7 @@
 @if (view() === 'dock') {
   <app-dock-bar [agents]="dockAgents()" [size]="preferences().dockSize" [now]="now()" [mode]="modeState()" [modeLabel]="modeLabel()"
     [emptyText]="detectedProfiles().length ? 'Ninguna mascota en el dock. Actívalas en Ajustes de vista.' : 'No se detectaron agentes.'"
-    (openSettings)="openSettings()" (openTimeline)="openTimelineFor($event)"></app-dock-bar>
+    (openSettings)="openSettings($event)" (openTimeline)="openTimelineFor($event)"></app-dock-bar>
   <p class="dock-hint">Overseer está en modo dock. Usa el botón de ajustes de la barra para volver a las cabinas.</p>
 } @else {
 <div class="app-shell" [attr.inert]="selected() || helpOpen() ? '' : null">
@@ -18,6 +18,7 @@
       <button class="icon-button" type="button" [attr.aria-pressed]="mascotEngine.calm()" (click)="toggleCalm()" aria-label="Modo calma" title="Modo calma (C)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14c2.6-5.2 5.7-5.2 8.4 0s5.7 5.2 8.3 0M4 19c2.5-3.2 5.3-3.2 7.8 0s5.3 3.2 7.8 0"/></svg></button>
       <button class="icon-button notification-toggle" type="button" [attr.aria-pressed]="notificationEnabled()" (click)="toggleNotifications()" aria-label="Notificaciones de Overseer" title="Notificaciones de Overseer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></button>
       @if (viewOverride()) { <button class="secondary-button" type="button" (click)="backToDock()">Volver al dock</button> }
+      <button class="icon-button settings-button" type="button" (click)="openSettings($any($event.currentTarget))" aria-label="Ajustes de vista" title="Ajustes de vista"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1" fill="none"/></svg></button>
       <button class="icon-button help-button" type="button" (click)="toggleHelp()" aria-label="Ayuda y atajos de teclado" title="Ayuda (?)">?</button>
     </div>
   </header>
@@ -154,6 +155,9 @@
   <footer class="page-footer"><span>Solo lectura · ejecución local</span><span>Presiona <kbd>?</kbd> para ver atajos</span></footer>
 </div>
 }
+
+<app-view-settings [profiles]="profiles()" [preferences]="preferences()" [calm]="mascotEngine.calm()" [saveError]="preferenceError()"
+  [michiState]="dockMichi()" [indicators]="dockIndicators()" (changed)="applyPreferences($event)" (calmChanged)="setCalm($event)"></app-view-settings>
 
 @if (selected(); as event) {
   <div class="detail-backdrop" (click)="closeDetail()" aria-hidden="true"></div>
