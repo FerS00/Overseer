@@ -59,6 +59,7 @@
             <span class="status-pill" [attr.data-status]="mascotStateFor(agent.id)"><i aria-hidden="true"></i>{{ statusLabel(mascotStateFor(agent.id)) }}</span>
           </header>
           <div class="cabin-scene">
+            <ao-activity-badge class="cabin-badge" [activity]="activityOf(agent.id)"></ao-activity-badge>
             @switch (agent.mascot) {
               @case ('chispa') { <ao-chispa class="cabin-mascot" [state]="mascotStateFor(agent.id)"></ao-chispa> }
               @case ('nodo') { <ao-nodo class="cabin-mascot" [state]="mascotStateFor(agent.id)"></ao-nodo> }
@@ -67,6 +68,7 @@
             }
             <section class="now-card" aria-label="Ahora">
               <span class="section-label">Ahora</span>
+              @if (activityFor(agent.id)) { <span class="now-activity">{{ activityFor(agent.id) }}</span> }
               <strong>{{ stateFor(agent.id).title }}</strong>
               @if (stateFor(agent.id).detail) { <code>{{ stateFor(agent.id).detail }}</code> }
               @else if (!stateFor(agent.id).lastTs) { <span class="quiet">Sin actividad reciente</span> }

@@ -11,6 +11,8 @@ import { MascotEngine } from './mascots/mascot-engine.service';
 import { compareEventRecency, MascotState, MASCOT_STATES, MASCOT_STATE_LABELS } from './mascots/mascot-state';
 import { MascotHandoff, MascotStateService } from './mascots/mascot-state.service';
 import { PreferencesService } from './preferences.service';
+import { ActivityBadgeComponent } from './dock/activity-badge.component';
+import { activityLabel } from './dock/dock.models';
 const EVENT_TYPES = ['session_start', 'user_prompt', 'thinking', 'message', 'tool_use', 'tool_result', 'handoff', 'turn_end', 'session_end', 'error', 'permission_request', 'note'] as const;
 const TYPE_LABELS: Record<string, string> = {
   session_start: 'Inicio de sesión', user_prompt: 'Prompt', thinking: 'Pensando', message: 'Mensaje', tool_use: 'Herramienta',
@@ -24,7 +26,7 @@ const OVERSCAN = 8;
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [MichiComponent, ChispaComponent, NodoComponent, AstroComponent, HondoComponent, JsonPipe],
+  imports: [MichiComponent, ChispaComponent, NodoComponent, AstroComponent, HondoComponent, JsonPipe, ActivityBadgeComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app.component.html',
   host: { '[class.calm-mode]': 'mascotEngine.calm()' },
@@ -435,6 +437,12 @@ export class AppComponent implements OnInit, OnDestroy {
     this.preferences.update((value) => ({ ...value, [key]: (event.target as HTMLSelectElement).value })); await this.savePreferences();
   }
   async updateFocus(event: Event): Promise<void> { this.preferences.update((value) => ({ ...value, focusAgent: (event.target as HTMLSelectElement).value })); await this.savePreferences(); }
+  activityFor(agent: string): string {
+    if (this.mascotDemo) return '';
+    const snapshot = this.mascotState.snapshots()[agent];
+    return snapshot?.activity ? activityLabel(snapshot) : '';
+  }
+  activityOf(agent: string) { return this.mascotDemo ? null : this.mascotState.snapshots()[agent]?.activity ?? null; }
   private refreshSessions(): void { this.fetchJson<AgentSession[]>('/api/sessions').then((sessions) => { if (sessions) this.mergeSessions(sessions); }); }
   private scrollTimelineTop(): void { this.viewport()?.nativeElement.scrollTo({ top: 0 }); this.viewportTop.set(0); }
   private animateHandoff(handoff: MascotHandoff): void {

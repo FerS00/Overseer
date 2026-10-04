@@ -1,0 +1,72 @@
+/* Revision 5: activity sub-states (prototype-desktop.html). */
+
+/* ---------- mascota envuelta: movimiento por subestado ---------- */
+ao-agent-pet { display: block; }
+.pet, .pet-var, .pet-body { display: block; width: 100%; height: 100%; transform-origin: 50% 90%; }
+.pet ao-chispa, .pet ao-nodo, .pet ao-astro, .pet ao-hondo { display: block; width: 100%; height: 100%; }
+.pet[data-activity="read.batch"] .pet-body { animation: pm-scan .7s ease-in-out infinite; }
+.pet[data-activity="read.tree"] .pet-body { animation: pm-nod 1.2s steps(3) infinite; }
+.pet[data-activity="read.web"] .pet-body { animation: pm-gaze-up 2.4s ease-in-out infinite; }
+.pet[data-activity="edit.multi"] .pet-body { animation: pm-side 1s steps(2) infinite; }
+.pet[data-activity="run.test"] .pet-body { animation: pm-tick 1.2s ease-out infinite; }
+.pet[data-activity="run.build"] .pet-body { animation: pm-thump .8s ease-in-out infinite; }
+.pet[data-activity="run.install"] .pet-body { animation: pm-sink 1.6s ease-in-out infinite; }
+.pet[data-activity="run.net"] .pet-body { animation: pm-pulse 1.4s ease-in-out infinite; }
+.pet[data-activity="run.wait"] .pet-body { animation: pm-sway 3.2s ease-in-out infinite; }
+.pet[data-activity="run.wait"] svg * { animation-play-state: paused; }
+.pet[data-family="px"] .pet-body { animation-timing-function: steps(2) !important; }
+@keyframes pm-scan { 25% { transform: translateX(-4%); } 75% { transform: translateX(4%); } }
+@keyframes pm-nod { 50% { transform: translateY(4%); } }
+@keyframes pm-gaze-up { 50% { transform: rotate(-4deg) translateY(-3%); } }
+@keyframes pm-side { 50% { transform: translateX(6%); } }
+@keyframes pm-tick { 0%, 70%, 100% { transform: translateY(0); } 82% { transform: translateY(-7%); } }
+@keyframes pm-thump { 0%, 100% { transform: scale(1, 1); } 40% { transform: scale(1.05, .94); } }
+@keyframes pm-sink { 50% { transform: translateY(4%); } }
+@keyframes pm-pulse { 50% { transform: scale(1.04); } }
+@keyframes pm-sway { 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
+
+/* ---------- insignias de subestado ---------- */
+ao-activity-badge { display: block; }
+ao-activity-badge:not([data-activity]) { display: none; }
+.bdg { display: block; width: 100%; height: 100%; overflow: visible; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.bdg .w { stroke: var(--fg); } .bdg .af { fill: currentColor; stroke: none; } .bdg .cut { stroke: var(--stage); }
+.bdg .t { fill: var(--line-strong); stroke: none; }
+.bdg * { transform-box: fill-box; transform-origin: center; }
+.bdg[data-badge="read.file"] .lens { animation: bd-scan 1.6s ease-in-out infinite; }
+.bdg[data-badge="read.batch"] .p3 { animation: bd-flip .9s steps(1) infinite; }
+.bdg[data-badge="read.batch"] .p2 { animation: bd-flip .9s steps(1) infinite .3s; }
+.bdg[data-badge="read.tree"] .n { animation: bd-dot 1.5s steps(1) infinite; }
+.bdg .n2 { animation-delay: .5s !important; } .bdg .n3 { animation-delay: 1s !important; }
+.bdg[data-badge="read.web"] .mer { animation: bd-spin-y 2s ease-in-out infinite; }
+.bdg[data-badge="edit.file"] .ln { transform-origin: 0 50%; animation: bd-write 1.2s steps(4) infinite; }
+.bdg[data-badge="edit.multi"] .pen { animation: bd-hop 1s steps(2) infinite; }
+.bdg[data-badge="run.shell"] .cur { animation: bd-cursor .9s steps(1) infinite; }
+.bdg[data-badge="run.test"] .t { animation: bd-pass 1.8s steps(1) infinite; }
+.bdg .t2 { animation-delay: .6s !important; } .bdg .t3 { animation-delay: 1.2s !important; }
+.bdg[data-badge="run.build"] .k { animation: bd-stack 1.8s steps(1) infinite; }
+.bdg .k2 { animation-delay: .6s !important; } .bdg .k3 { animation-delay: 1.2s !important; }
+.bdg[data-badge="run.install"] .arr { animation: bd-drop .9s ease-in infinite; }
+.bdg[data-badge="run.net"] .arc { animation: bd-dot 1.2s steps(1) infinite; }
+.bdg .a2 { animation-delay: .4s !important; } .bdg .a3 { animation-delay: .8s !important; }
+.bdg[data-badge="run.wait"] .glass { animation: bd-turn 2.4s cubic-bezier(.6,0,.3,1) infinite; }
+.bdg[data-badge="run.wait"] .sat { transform-box: view-box; transform-origin: 10px 10px; animation: bd-orbit 3.2s linear infinite; }
+@keyframes bd-scan { 50% { transform: translate(2px, 1px); } }
+@keyframes bd-flip { 0% { opacity: 1; } 50% { opacity: .15; } }
+@keyframes bd-dot { 0% { opacity: .25; } 33% { opacity: 1; } 66% { opacity: .25; } }
+@keyframes bd-spin-y { 50% { transform: scaleX(.15); } }
+@keyframes bd-write { 0% { transform: scaleX(.1); } 100% { transform: scaleX(1); } }
+@keyframes bd-hop { 50% { transform: translateX(-7px); } }
+@keyframes bd-cursor { 50% { opacity: 0; } }
+@keyframes bd-pass { 0% { fill: var(--line-strong); } 50% { fill: var(--ok); } }
+@keyframes bd-stack { 0% { opacity: 1; } 66% { opacity: 0; } }
+@keyframes bd-drop { 0% { transform: translateY(-3px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(2px); opacity: 0; } }
+@keyframes bd-turn { 0%, 40% { transform: rotate(0); } 60%, 100% { transform: rotate(180deg); } }
+@keyframes bd-orbit { to { transform: rotate(360deg); } }
+
+/* ---------- vista de cabinas: subestado ---------- */
+.cabin-scene { position: relative; }
+.cabin-badge { position: absolute; top: 8px; left: 8px; width: 28px; height: 28px; padding: 3px; border-radius: 9px; background: var(--surface-2); color: var(--agent-color, var(--fg)); }
+.now-activity { color: var(--muted); font: 600 .72rem var(--font-mono); letter-spacing: .06em; text-transform: uppercase; }
+
+/* ---------- calma y movimiento reducido ---------- */
+.calm-mode .pet-body, .calm-mode .pet svg *, .calm-mode .bdg * { animation: none !important; transition: none !important; }
