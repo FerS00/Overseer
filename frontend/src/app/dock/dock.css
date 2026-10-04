@@ -114,7 +114,7 @@ ao-activity-badge:not([data-activity]) { display: none; }
 @keyframes fly-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 .fly-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .fly-head h2 { margin: 0; color: var(--accent); font-size: 1.15rem; }
-.fly-head .sub { color: var(--muted); font: 400 .75rem var(--font-mono); }
+.fly-head .sub { color: var(--muted); font: 400 .75rem var(--font-mono); white-space: nowrap; }
 .fly-now { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--stage); }
 .fly-act { display: flex; align-items: center; gap: 10px; }
 .fly-act b { display: block; font-weight: 600; }
@@ -190,6 +190,8 @@ dialog.settings::backdrop { background: rgba(5, 7, 12, .6); }
   .dock[data-size="normal"] { --slot: 54px; --pet: 34px; }
   .dock[data-size="compact"] { --slot: 46px; --pet: 28px; }
   .times { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .slot-label { gap: 3px; font-size: .56rem; letter-spacing: 0; }
+  .dock[data-size="compact"] .slot-label { font-size: .5rem; }
   .agent-row { grid-template-columns: 28px minmax(0, 1fr) auto; }
   .agent-row .moves { grid-column: 2 / -1; justify-content: flex-end; }
 }

@@ -19,7 +19,7 @@ import { activityLabel, capitalize, DockAgent, formatDuration, MASCOT_NAMES } fr
   },
   template: `
     <div class="fly-head">
-      <div><h2 id="flyout-title">{{ agent().name }}</h2><span class="sub">{{ mascotName() }}{{ agent().sessionId ? ' · sesión ' + agent().sessionId!.slice(0, 8) : '' }}</span></div>
+      <div><h2 id="flyout-title">{{ agent().name }}</h2><span class="sub">{{ mascotName() }}{{ agent().sessionId ? ' · sesión ' + sessionLabel() : '' }}</span></div>
       <span class="status-pill" [attr.data-status]="agent().state"><i aria-hidden="true"></i>{{ stateLabel() }}</span>
     </div>
     <div class="fly-now">
@@ -68,6 +68,7 @@ export class AgentFlyoutComponent {
   readonly mascotName = computed(() => MASCOT_NAMES[this.agent().mascot]);
   readonly stateLabel = computed(() => capitalize(MASCOT_STATE_LABELS[this.agent().state]));
   readonly label = computed(() => activityLabel(this.agent()));
+  readonly sessionLabel = computed(() => { const id = this.agent().sessionId || ''; return id.length > 14 ? id.slice(0, 13) + '…' : id; });
   readonly kindLabel = computed(() => { const target = this.agent().target; return target ? TARGET_KIND_LABELS[target.kind].toLocaleUpperCase('es-PE') : ''; });
   readonly targetText = computed(() => { const target = this.agent().target; return !target ? '' : target.kind === 'file' ? middleEllipsis(target.text, 56) : target.text; });
   duration(ms: number): string { return formatDuration(ms); }
