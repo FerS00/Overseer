@@ -1,5 +1,5 @@
 import {
-  ChangeDetectionStrategy, Component, ElementRef, OnDestroy, OnInit, computed, signal, viewChild,
+  ChangeDetectionStrategy, Component, ElementRef, OnDestroy, OnInit, computed, inject, signal, viewChild,
 } from '@angular/core';
 import { JsonPipe } from '@angular/common';
 import { Subscription } from 'rxjs';
@@ -10,6 +10,7 @@ import { AstroComponent, ChispaComponent, HondoComponent, MichiComponent, NodoCo
 import { MascotEngine } from './mascots/mascot-engine.service';
 import { compareEventRecency, MascotState, MASCOT_STATES, MASCOT_STATE_LABELS } from './mascots/mascot-state';
 import { MascotHandoff, MascotStateService } from './mascots/mascot-state.service';
+import { PreferencesService } from './preferences.service';
 const EVENT_TYPES = ['session_start', 'user_prompt', 'thinking', 'message', 'tool_use', 'tool_result', 'handoff', 'turn_end', 'session_end', 'error', 'permission_request', 'note'] as const;
 const TYPE_LABELS: Record<string, string> = {
   session_start: 'Inicio de sesión', user_prompt: 'Prompt', thinking: 'Pensando', message: 'Mensaje', tool_use: 'Herramienta',
@@ -20,7 +21,6 @@ const MAX_EVENTS = 3000;
 const MAX_PAUSED_EVENTS = 250;
 const ROW_HEIGHT = 76;
 const OVERSCAN = 8;
-interface ViewPreferences { agentOrder: string[]; hiddenAgents: string[]; layout: string; density: string; focusAgent: string; }
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -30,10 +30,11 @@ interface ViewPreferences { agentOrder: string[]; hiddenAgents: string[]; layout
   host: { '[class.calm-mode]': 'mascotEngine.calm()' },
 })
 export class AppComponent implements OnInit, OnDestroy {
+  private readonly prefs = inject(PreferencesService);
   readonly profiles = signal<AgentMeta[]>(AGENT_PROFILES.slice(0, 2));
   readonly agentIds: string[] = AGENT_PROFILES.map((p) => p.id);
   readonly detectedProfiles = computed(() => this.profiles().filter((profile) => profile.detected));
-  readonly preferences = signal<ViewPreferences>({ agentOrder: [...this.agentIds], hiddenAgents: [], layout: 'automatic', density: 'normal', focusAgent: 'claude' });
+  readonly preferences = this.prefs.preferences;
   readonly visibleProfiles = computed(() => this.preferences().agentOrder.map((id) => this.profiles().find((p) => p.id === id)).filter((p): p is AgentMeta => !!p && p.detected !== false && !this.preferences().hiddenAgents.includes(p.id)));
   readonly mascotOptions = MASCOT_STATES;
   readonly eventTypes = EVENT_TYPES;
@@ -53,8 +54,7 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly selectedAgents = signal<string[]>([]);
   readonly draggedAgent = signal<string | null>(null);
   readonly hiddenProfiles = computed(() => this.detectedProfiles().filter((p) => this.preferences().hiddenAgents.includes(p.id)));
-  readonly preferenceError = signal('');
-  private preferenceQueue: Promise<void> = Promise.resolve();
+  readonly preferenceError = this.prefs.error;
   readonly notificationEnabled = signal(false);
   readonly canLoadMore = signal(true);
   readonly loadingMore = signal(false);
@@ -366,27 +366,15 @@ export class AppComponent implements OnInit, OnDestroy {
     return values.includes('done') ? 'done' : 'idle';
   }
   private async loadPreferences(): Promise<void> {
-    const stored = this.fetchJson<ViewPreferences>('/api/preferences');
+    const stored = this.prefs.load();
     const agents = this.fetchJson<Array<{ id?: string; agent?: string; name?: string; mascot?: string; color?: string; detected?: boolean; detected_by?: string; sources?: string[] }>>('/api/agents');
-    const [preferences, detected] = await Promise.all([stored, agents]);
+    const [, detected] = await Promise.all([stored, agents]);
     if (detected) this.profiles.set(detected.map((item) => {
       const id = item.id || item.agent || ''; const fallback = AGENT_PROFILES.find((profile) => profile.id === id)!;
       return { ...fallback, ...item, id } as AgentMeta;
     }).filter((item) => this.agentIds.includes(item.id)));
-    if (preferences && Array.isArray(preferences.agentOrder) && Array.isArray(preferences.hiddenAgents)) this.preferences.set({ ...preferences, agentOrder: [...new Set(preferences.agentOrder.filter((id) => this.agentIds.includes(id)))].concat(this.agentIds.filter((id) => !preferences.agentOrder.includes(id))) });
-    else try { const cached = JSON.parse(localStorage.getItem('agent-ops-view') || 'null'); if (cached?.hiddenAgents) this.preferences.set({ ...this.preferences(), ...cached }); } catch { /* preferencias locales opcionales */ }
   }
-  async savePreferences(): Promise<void> {
-    const value = this.preferences(); try { localStorage.setItem('agent-ops-view', JSON.stringify(value)); } catch { /* almacenamiento opcional */ }
-    this.preferenceQueue = this.preferenceQueue.then(async () => {
-      try {
-        const response = await fetch('/api/preferences', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value) });
-        if (!response.ok) throw new Error('save');
-        this.preferenceError.set('');
-      } catch { this.preferenceError.set('La vista se conserva en este navegador. No se pudo guardar en el servidor.'); }
-    });
-    await this.preferenceQueue;
-  }
+  savePreferences(): Promise<void> { return this.prefs.save(); }
   async moveAgent(id: string, direction: -1 | 1): Promise<void> {
     const visible: string[] = this.visibleProfiles().map((p) => p.id); const index = visible.indexOf(id); const next = index + direction;
     if (index < 0 || next < 0 || next >= visible.length) return;
