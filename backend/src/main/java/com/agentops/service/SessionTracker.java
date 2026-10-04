@@ -1,6 +1,7 @@
 package com.agentops.service;
 
 import com.agentops.config.AppProperties;
+import com.agentops.config.AgentProfiles;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import java.time.Clock;
@@ -26,7 +27,7 @@ public class SessionTracker {
 
   public synchronized void accept(Map<String, Object> event) {
     String agent = String.valueOf(event.get("agent"));
-    if (!Set.of("claude", "codex").contains(agent)) return;
+    if (!AgentProfiles.supports(agent)) return;
     String id = text(event.get("session_id"), agent + ":default");
     String parent = nullable(event.get("parent_session_id"));
     String type = String.valueOf(event.get("type"));

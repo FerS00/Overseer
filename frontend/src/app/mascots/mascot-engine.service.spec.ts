@@ -11,16 +11,23 @@ describe('MascotEngine', () => {
   });
   afterEach(() => {
     vi.restoreAllMocks(); localStorage.removeItem(MascotEngine.CALM_KEY);
+    vi.useRealTimers();
     if (originalMatchMedia) Object.defineProperty(window, 'matchMedia', { configurable: true, value: originalMatchMedia });
     else Reflect.deleteProperty(window, 'matchMedia');
   });
 
-  it('uses one pointer listener and one animation frame for three registered mascots', () => {
+  it('uses one pointer listener and one shared frame schedule', () => {
+    vi.useFakeTimers();
+    const schedule = vi.spyOn(window, 'setTimeout');
     const listener = vi.spyOn(window, 'addEventListener');
     const engine = new MascotEngine(document, 'browser' as unknown as object);
     const participants: MascotParticipant[] = Array.from({ length: 3 }, () => ({ lookAt: vi.fn(), renderFrame: vi.fn() }));
     participants.forEach((participant) => engine.register(participant));
     expect(listener.mock.calls.filter(([type]) => type === 'pointermove')).toHaveLength(1);
+    expect(schedule).toHaveBeenCalledTimes(1);
+    expect(schedule).toHaveBeenLastCalledWith(expect.any(Function), MascotEngine.FRAME_INTERVAL_MS);
+    expect(window.requestAnimationFrame).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(MascotEngine.FRAME_INTERVAL_MS);
     expect(window.requestAnimationFrame).toHaveBeenCalledTimes(1);
     engine.destroy();
   });
@@ -36,15 +43,45 @@ describe('MascotEngine', () => {
     engine.destroy();
   });
 
+  it('slows idle gaze sampling and immediately resumes a shared fast schedule on pointer input', () => {
+    vi.useFakeTimers();
+    let now = 0;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    let callback: FrameRequestCallback | undefined;
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((frame) => { callback = frame; return 1; });
+    const schedule = vi.spyOn(window, 'setTimeout');
+    const engine = new MascotEngine(document, 'browser' as unknown as object);
+    engine.register({ lookAt: vi.fn(), renderFrame: vi.fn() });
+    vi.advanceTimersByTime(MascotEngine.FRAME_INTERVAL_MS);
+    now = 6000;
+    callback?.(now);
+    expect(schedule).toHaveBeenLastCalledWith(expect.any(Function), MascotEngine.IDLE_FRAME_INTERVAL_MS);
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 100, clientY: 100 }));
+    expect(schedule).toHaveBeenLastCalledWith(expect.any(Function), MascotEngine.FRAME_INTERVAL_MS);
+    engine.destroy();
+  });
+
   it('stops and resumes the shared frame with document visibility', () => {
+    vi.useFakeTimers();
+    const cancelTimer = vi.spyOn(window, 'clearTimeout');
+    const animationFrame = vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1);
+    const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
     const engine = new MascotEngine(document, 'browser' as unknown as object);
     engine.register({ lookAt: vi.fn(), renderFrame: vi.fn() });
     Object.defineProperty(document, 'hidden', { configurable: true, value: true });
     document.dispatchEvent(new Event('visibilitychange'));
-    expect(window.cancelAnimationFrame).toHaveBeenCalledWith(1);
+    expect(cancelTimer).toHaveBeenCalled();
     Object.defineProperty(document, 'hidden', { configurable: true, value: false });
     document.dispatchEvent(new Event('visibilitychange'));
-    expect(window.requestAnimationFrame).toHaveBeenCalledTimes(2);
+    vi.advanceTimersByTime(MascotEngine.FRAME_INTERVAL_MS);
+    expect(animationFrame).toHaveBeenCalledTimes(1);
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(cancelFrame).toHaveBeenCalledWith(1);
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+    document.dispatchEvent(new Event('visibilitychange'));
+    vi.advanceTimersByTime(MascotEngine.FRAME_INTERVAL_MS);
+    expect(animationFrame).toHaveBeenCalledTimes(2);
     engine.destroy();
     Object.defineProperty(document, 'hidden', { configurable: true, value: false });
   });

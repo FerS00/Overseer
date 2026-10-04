@@ -1,6 +1,6 @@
 # Overseer
-**A local, read-only activity monitor for Claude Code and Codex**<br>
-*See both agents work in real time, with one animated mascot for each.*
+**A local, read-only activity monitor for Claude Code, Codex, Antigravity, and DeepSeek Harness**<br>
+*See detected agents work in real time, with one animated mascot for each.*
 
 ![Java](https://img.shields.io/badge/Java-21-ED8B00?style=flat-square&logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?style=flat-square&logo=springboot&logoColor=white)
@@ -17,24 +17,41 @@
 ---
 
 ### Overview
-> Overseer is a local, real-time, read-only monitor for Claude Code and Codex. Each agent has an animated mascot that reflects its current activity, alongside sessions and a filterable event timeline.
+> Overseer is a local, real-time, read-only monitor for Claude Code, Codex, Antigravity, and DeepSeek Harness. It shows installed agents, their sessions, and a filterable event timeline. Customize directly on each cabin: drag its handle to reorder, select several checkboxes to hide them together, or open its options for focus, layout, density, and keyboard movement. Hidden agents have recovery buttons. The layout rearranges as cabins are hidden or restored: a single cabin stays centered, and three cabins place the last one below the centered pair.
 
 ---
 
 ### Mascots
-#### Claude Code · Chispa
-<img src="docs/images/mascots-claude.png" alt="Chispa in nine states" width="100%">
+#### Michi
+<img src="docs/images/michi.png" alt="Michi in nine states" width="100%">
 
-Chispa is an original pixel creature inspired by Claude Code's mascot. It shows nine states: idle, thinking, reading, editing, running, permission, done, error, and sleeping.
+Michi is the user's pixel cat, with one collar light per detected agent.
+
+#### Claude Code · Chispa
+<img src="docs/images/mascots-chispa.png" alt="Chispa in nine states" width="100%">
+
+Chispa is the pixel character for Claude Code. Its drawings and animation follow the approved prototype.
 
 #### Codex · Nodo
-<img src="docs/images/mascots-codex.png" alt="Nodo in nine states" width="100%">
+<img src="docs/images/mascots-nodo.png" alt="Nodo in nine states" width="100%">
 
-Nodo is a cloud with a `>_` prompt inspired by the Codex icon. It shows nine states: idle, thinking, reading, editing, running, permission, done, error, and sleeping.
+Nodo is the purple character for Codex, with a white prompt on its face.
 
-<img src="docs/images/vigia.png" width="96" alt="Vigía"> Vigía is the project's lighthouse keeper.
+#### Antigravity · Astro
+<img src="docs/images/mascots-astro.png" alt="Astro in nine states" width="100%">
+
+Astro is the pink orbital character for Antigravity.
+
+#### DeepSeek Harness · Hondo
+<img src="docs/images/mascots-hondo.png" alt="Hondo in nine states" width="100%">
+
+Hondo is the blue character for DeepSeek Harness. Each agent mascot shows idle, thinking, reading, editing, running, permission, done, error, and sleeping states.
 
 ![Timeline event detail](docs/images/timeline-detail.png)
+
+![Three visible cabins](docs/images/layout-three.png)
+
+![One centered cabin](docs/images/layout-one.png)
 
 ![Mobile layout](docs/images/mobile.png)
 
@@ -44,14 +61,17 @@ Nodo is a cloud with a `>_` prompt inspired by the Codex icon. It shows nine sta
 
 ### Key Engineering Decisions / Architecture
 - **Observe only:** hooks and rollout readers collect agent activity; Overseer does not send commands to either agent.
-- **Two Codex sources, one event stream:** Codex hooks and session rollouts complement each other. Stable `uid` values deduplicate matching events.
+- **Agent-specific event sources:** Claude Code, Codex, Antigravity, and DeepSeek Harness hooks feed one event stream; Codex rollouts remain a second source. Stable `uid` values deduplicate matching events.
+- **Readable Antigravity activity:** normal Stop events show “Turno finalizado”; failures and background work have distinct labels. Historical `NO_TOOL_CALL` stops use the same readable label without rewriting stored history or hiding real tool calls.
 - **Resumable file reads:** the NDJSON tailer and rollout watcher persist byte offsets and resume after restarts or file truncation.
 - **Replayable live updates:** Server-Sent Events (SSE) use database event IDs and `Last-Event-ID` to replay missed events after reconnecting.
 - **Redact before storage:** hook output is redacted before it reaches the event file; the backend redacts again before persistence and broadcast.
 - **Local access by default:** the ingest endpoint requires a local token, and the standalone server binds to `127.0.0.1` by default.
 - **Bounded history:** event retention defaults to 14 days; set `AGENT_OPS_RETENTION_DAYS=0` to disable deletion. In-memory event buffers are bounded.
 - **Tracked sessions:** sessions are `active`, `idle`, or `ended`; the idle threshold defaults to 10 minutes.
+- **Team detection and view preferences:** installation markers drive the catalog shown in the UI. Agent order, visibility, layout, and density persist through `GET/PUT /api/preferences` and fall back to browser storage.
 - **One mascot animation loop:** mascots share one `requestAnimationFrame` loop and one passive `pointermove` listener. Calm mode and `prefers-reduced-motion` stop continuous animation.
+- **Prototype fidelity:** the five SVG drawings and their state-specific colors, expressions, and animations follow `design-system/agent-ops/prototype-v4.html`. Browser regression checks compare geometry and animation keyframes against that reference in all nine states, and exercise pointer tracking, clicks, and live SSE state changes.
 - **Container defaults:** Docker Compose uses H2 and runs the app as a non-root user. The host port is published on loopback.
 - **Compatibility names:** Java package `com.agentops`, `spring.application.name`, `AGENT_OPS_*` variables, `~/.agent-ops/`, `X-Agent-Ops-Token`, Compose container `agent-ops`, the JAR name, npm package name, and `design-system/agent-ops/` remain unchanged for compatibility.
 
@@ -59,6 +79,8 @@ Nodo is a cloud with a `>_` prompt inspired by the Codex icon. It shows nine sta
 flowchart LR
     CH[Claude Code hooks] --> NDJSON[(Redacted NDJSON)]
     CX[Codex hooks] --> NDJSON
+    AG[Antigravity hooks] --> NDJSON
+    DS[DeepSeek Harness hooks] --> NDJSON
     NDJSON --> FT[FileTailer]
     CR[Codex rollout JSONL] --> CW[CodexSessionWatcher]
     FT --> ES[Normalize · deduplicate · redact]
@@ -79,7 +101,7 @@ flowchart LR
 | **Backend** | `Java 21` · `Spring Boot 3.5` · `Spring MVC` · `Spring Data JPA` |
 | **Storage** | `H2` · `MySQL` (optional) · `Flyway` |
 | **Frontend** | `Angular 22` · `TypeScript 6` · `RxJS` |
-| **Integrations** | `Node.js 24` · `Claude Code hooks` · `Codex hooks and rollout JSONL` |
+| **Integrations** | `Node.js 24` · Claude Code · Codex hooks and rollout JSONL · Antigravity · DeepSeek Harness |
 | **Verification** | `Maven` · `Vitest` · `Playwright` · `node:test` |
 | **Packaging** | `Docker` · `Docker Compose` |
 
@@ -88,7 +110,7 @@ flowchart LR
 ### Requirements
 - **Docker run:** Docker Desktop and Node.js 24 for the host-side agent hooks. Java and Maven are not required for this path.
 - **Local development:** Java 21 JDK, Maven 3.9 or newer, Node.js 24.15 or newer, and npm (Angular 22). Node.js is also required by the hooks, which invoke `node` from `PATH`.
-- Claude Code and/or Codex installed as a CLI or desktop app.
+- One or more supported agents installed: Claude Code, Codex, Antigravity, or DeepSeek Harness.
 - Git.
 - Port `8787` for the application and port `4200` for the Angular development server.
 - Tested on Windows 11. macOS and Linux should work, but have not been verified.
@@ -145,6 +167,8 @@ npm start
 
 The development UI is at `http://127.0.0.1:4200`; its proxy forwards API and SSE requests to port `8787`.
 
+The setup detects installed agents and configures their integrations. Antigravity uses `~/.gemini/config/hooks.json`; DeepSeek Harness uses its desktop profile. See [Configuration](docs/CONFIGURATION.md) for supported client paths and verification limits.
+
 Connect the installed agents. Claude Code hooks are added to `~/.claude/settings.json`. Codex setup enables `[features] hooks = true` and adds hook entries to `~/.codex/config.toml`. Review the dry-run diff before applying; `--apply` creates timestamped backups of existing settings files. In Codex, open `/hooks` and trust the changed hooks. If you leave them untrusted, Overseer can still read Codex activity from `~/.codex/sessions` rollouts. Then run the diagnostic:
 
 ```powershell
@@ -168,6 +192,8 @@ cd ..; node --test integrations/
 | :--- | :--- |
 | Claude Code hooks and stream integration | Implemented; Node tests included |
 | Codex hooks and rollout reader | Implemented; Node and backend tests included |
+| Antigravity CLI hooks | Implemented; real CLI activity and history verified locally |
+| DeepSeek Harness hooks | Implemented; fixtures tested, real client session not yet verified |
 | Local API, persistence, sessions, and SSE | Implemented; Maven tests included |
 | Angular dashboard and mascot system | Implemented; Vitest and Playwright tests included |
 | Desktop island window | Planned |

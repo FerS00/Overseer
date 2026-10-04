@@ -10,6 +10,7 @@ export const EVENTS_FILE = configuredEventsFile
   : path.join(os.homedir(), '.agent-ops', 'events.ndjson');
 
 const TYPES = new Set(['session_start', 'user_prompt', 'thinking', 'message', 'tool_use', 'tool_result', 'handoff', 'turn_end', 'session_end', 'error', 'note', 'permission_request']);
+const AGENTS = new Set(['claude', 'codex', 'antigravity', 'deepseek']);
 
 // Stable cross-source key: SHA-256(agent + LF + session_id + LF + source_key), UTF-8, lowercase hex.
 export function eventUid(agent, sessionId, sourceKey) {
@@ -18,7 +19,7 @@ export function eventUid(agent, sessionId, sourceKey) {
 
 export function emit(event) {
   try {
-    if (!event || typeof event !== 'object' || !['claude', 'codex'].includes(event.agent)) return false;
+    if (!event || typeof event !== 'object' || !AGENTS.has(event.agent)) return false;
     const agent = event.agent;
     const sessionId = event.session_id ?? event.meta?.session_id ?? '';
     const sourceKey = event.source_key || randomUUID();

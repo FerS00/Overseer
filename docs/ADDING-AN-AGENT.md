@@ -1,6 +1,6 @@
 # Adding an agent
 
-The runtime catalog currently accepts only `claude` and `codex`. Adding an agent requires coordinated code changes across the backend, frontend, integration, mascot, session handling, tests, and public documentation. There is no runtime agent registration UI.
+The runtime catalog accepts `claude`, `codex`, `antigravity`, and `deepseek`. Adding another agent requires coordinated code changes across the backend, frontend, integration, mascot, session handling, tests, and public documentation. There is no runtime agent registration UI.
 
 ## Procedure
 

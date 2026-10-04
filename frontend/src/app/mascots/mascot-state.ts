@@ -26,12 +26,13 @@ export const MASCOT_STATE_LABELS: Record<MascotState, string> = {
   permission: 'pide permiso', done: 'terminó', error: 'error', sleeping: 'durmiendo',
 };
 
-export function vigiaState(claude: MascotState, codex: MascotState): MascotState {
-  if (claude === 'permission' || codex === 'permission') return 'permission';
-  if (claude === 'error' || codex === 'error') return 'error';
-  if ([claude, codex].some((state) => ['thinking', 'reading', 'editing', 'running'].includes(state))) return 'thinking';
-  if (claude === 'done' || codex === 'done') return 'done';
-  if (claude === 'sleeping' && codex === 'sleeping') return 'sleeping';
+export function michiState(states: Record<string, MascotState>): MascotState {
+  const values = Object.values(states);
+  if (values.includes('error')) return 'error';
+  if (values.includes('permission')) return 'permission';
+  if (values.some((state) => ['thinking', 'reading', 'editing', 'running'].includes(state))) return 'thinking';
+  if (values.includes('done')) return 'done';
+  if (!values.length || values.every((state) => state === 'sleeping')) return 'sleeping';
   return 'idle';
 }
 

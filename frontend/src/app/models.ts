@@ -2,7 +2,7 @@ export interface AgentEvent {
   id?: number;
   uid?: string;
   ts: string;
-  agent: 'claude' | 'codex';
+  agent: 'claude' | 'codex' | 'antigravity' | 'deepseek';
   session_id?: string | null;
   parent_session_id?: string | null;
   source?: 'hook' | 'rollout' | 'ingest' | 'stream';
@@ -25,7 +25,7 @@ export interface AgentState {
 
 export interface AgentSession {
   id: string;
-  agent: 'claude' | 'codex';
+  agent: 'claude' | 'codex' | 'antigravity' | 'deepseek';
   cwd?: string | null;
   model?: string | null;
   started_at: string;

@@ -38,6 +38,7 @@ public class EventStoreService {
   private final Set<String> activeSources = ConcurrentHashMap.newKeySet();
   private volatile String lastRollout;
   private volatile String lastRolloutAt;
+  private final Map<String, String> lastAgentEventAt = new ConcurrentHashMap<>();
 
   @org.springframework.beans.factory.annotation.Autowired
   public EventStoreService(AgentEventRepository repository, SseBroadcaster broadcaster, ObjectMapper objectMapper,
@@ -55,7 +56,10 @@ public class EventStoreService {
     try {
       List<AgentEvent> recent = new ArrayList<>(repository.findAll(PageRequest.of(0, 200, Sort.by(Sort.Direction.DESC, "id"))).getContent());
       Collections.reverse(recent);
-      for (AgentEvent a : recent) if (AgentProfiles.supports(a.getAgent())) buffer.addLast(a.toMap(objectMapper));
+      for (AgentEvent a : recent) if (AgentProfiles.supports(a.getAgent())) {
+        Map<String, Object> event = a.toMap(objectMapper); buffer.addLast(event);
+        lastAgentEventAt.put(a.getAgent(), String.valueOf(event.get("ts")));
+      }
     } catch (Exception e) { log.warn("No se pudo cargar el historial ({}): {}", e.getClass().getSimpleName(), e.getMessage()); }
   }
 
@@ -68,6 +72,7 @@ public class EventStoreService {
       AgentEvent saved = repository.saveAndFlush(AgentEvent.fromMap(ev, objectMapper));
       ev.put("id", saved.getId());
       if (sessionTracker != null) sessionTracker.accept(ev);
+      lastAgentEventAt.put(String.valueOf(ev.get("agent")), String.valueOf(ev.get("ts")));
       markSourceActive(String.valueOf(ev.get("source")));
       buffer.addLast(ev);
       while (buffer.size() > MAX_BUFFER) buffer.pollFirst();
@@ -106,8 +111,9 @@ public class EventStoreService {
   private int countForRequest(int limit) { return Math.min(Math.max(0, limit), 500); }
 
   private List<Map<String, Object>> getRecentFromDatabase(int limit, String agent, String session, String type, String query, String before) {
-    StringBuilder sql = new StringBuilder("SELECT id FROM agent_events WHERE agent IN ('claude', 'codex')");
-    List<Object> args = new ArrayList<>();
+    List<Object> args = new ArrayList<>(AgentProfiles.all().stream().map(AgentProfiles.Profile::id).toList());
+    StringBuilder sql = new StringBuilder("SELECT id FROM agent_events WHERE agent IN (")
+        .append(String.join(",", Collections.nCopies(args.size(), "?"))).append(")");
     if (agent != null && !agent.isBlank()) { sql.append(" AND agent = ?"); args.add(agent); }
     if (session != null && !session.isBlank()) { sql.append(" AND session_id = ?"); args.add(session); }
     if (type != null && !type.isBlank()) { sql.append(" AND type = ?"); args.add(type); }
@@ -155,6 +161,7 @@ public class EventStoreService {
   }
 
   public void markSourceActive(String source) { activeSources.add(source); }
+  public String lastAgentEventAt(String agent) { return lastAgentEventAt.get(agent); }
   public void discard(String reason) { count(reason); }
   public void markRolloutRead(String path) { lastRollout = path; lastRolloutAt = Instant.now().toString(); markSourceActive("rollout"); }
   public Map<String, Object> diagnostics() {
@@ -165,7 +172,7 @@ public class EventStoreService {
 
   private Map<String, Object> normalize(Map<String, Object> raw) {
     Object agentValue = raw.get("agent");
-    if (!(agentValue instanceof String s) || !Set.of("claude", "codex").contains(s.trim().toLowerCase(Locale.ROOT))) {
+    if (!(agentValue instanceof String s) || !AgentProfiles.supports(s.trim().toLowerCase(Locale.ROOT))) {
       count(agentValue == null ? "missing_agent" : "invalid_agent"); return null;
     }
     String agent = s.trim().toLowerCase(Locale.ROOT);

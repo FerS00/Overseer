@@ -1,7 +1,7 @@
 <div class="app-shell" [attr.inert]="selected() || helpOpen() ? '' : null">
   <header class="topbar">
     <div class="brand-lockup">
-      <ao-vigia class="header-mascot" [state]="vigia()" [claudeState]="mascotStateFor('claude')" [codexState]="mascotStateFor('codex')"></ao-vigia>
+      <ao-michi class="header-mascot" [state]="michi()" [lights]="visibleProfiles().length" [indicators]="michiIndicators()" [lastAgent]="mascotDemo ? lastDemoAgent() : mascotState.lastActiveAgent()"></ao-michi>
       <div><p class="eyebrow">Monitor local</p><h1>Overseer</h1></div>
     </div>
     <div class="topbar-controls">
@@ -18,22 +18,53 @@
   @if (mascotDemo) {
     <div class="mascot-demo" aria-label="Datos de ejemplo · estado de mascotas">
       <span>Datos de ejemplo · estado de mascotas</span>
-      <label>Claude Code <select aria-label="Estado de ejemplo de Claude Code" [value]="demoStates().claude" (change)="setDemoState('claude', $event)">@for (state of mascotOptions; track state) { <option [value]="state">{{ statusLabel(state) }}</option> }</select></label>
-      <label>Codex <select aria-label="Estado de ejemplo de Codex" [value]="demoStates().codex" (change)="setDemoState('codex', $event)">@for (state of mascotOptions; track state) { <option [value]="state">{{ statusLabel(state) }}</option> }</select></label>
+      @for (agent of profiles(); track agent.id) { <label>{{ agent.name }} <select [attr.aria-label]="'Estado de ejemplo de ' + agent.name" [value]="demoStates()[agent.id]" (change)="setDemoState(agent.id, $event)">@for (state of mascotOptions; track state) { <option [value]="state">{{ statusLabel(state) }}</option> }</select></label> }
     </div>
   }
 
   <main>
-    <section class="cabins" aria-label="Agentes">
-      @for (agent of profiles; track agent.id) {
-        <article class="cabin" [class.agent-claude]="agent.id === 'claude'" [class.agent-codex]="agent.id === 'codex'">
+    @if (selectedAgents().length) {
+      <div class="selection-actions" role="group" aria-label="Cabinas seleccionadas">
+        <span>{{ selectedAgents().length }} seleccionados</span>
+        <button type="button" (click)="hideAgents(selectedAgents())">Ocultar {{ selectedAgents().length }} seleccionados</button>
+        <button type="button" (click)="selectedAgents.set([])">Cancelar selección</button>
+      </div>
+    }
+    @if (hiddenProfiles().length) {
+      <div class="hidden-agents" role="group" aria-label="Recuperar agentes ocultos">
+        <span>Ocultos</span>
+        @for (agent of hiddenProfiles(); track agent.id) { <button class="restore-agent" type="button" (click)="restoreAgents([agent.id])" [attr.aria-label]="'Mostrar ' + agent.name">+ {{ agent.name }}</button> }
+        @if (hiddenProfiles().length > 1) { <button type="button" (click)="restoreAgents()">Mostrar todos</button> }
+      </div>
+    }
+    @if (preferenceError()) { <p role="status" class="quiet">{{ preferenceError() }}</p> }
+    @if (visibleProfiles().length === 0) { <section class="empty-state"><ao-michi class="empty-mascot" [state]="'sleeping'" [lights]="0"></ao-michi><div><h2>{{ detectedProfiles().length ? 'No hay agentes visibles' : 'No se detectaron agentes' }}</h2><p>{{ detectedProfiles().length ? 'Recupera los agentes con los botones Mostrar.' : 'Instala un agente compatible o indica su ruta de configuración para detectarlo.' }}</p></div></section> }
+    <section class="cabins" [attr.data-layout]="preferences().layout" [attr.data-density]="preferences().density" [attr.data-focus]="preferences().focusAgent" [attr.data-count]="visibleProfiles().length" [style.--cabin-count]="visibleProfiles().length" aria-label="Agentes">
+      @for (agent of visibleProfiles(); track agent.id; let i = $index) {
+        <article class="cabin" [class]="'cabin agent-' + agent.id" [style.--agent-color]="agent.color" [class.cabin-selected]="selectedAgents().includes(agent.id)" (dragover)="$event.preventDefault()" (drop)="dropAgent(agent.id, $event)" [hidden]="preferences().layout === 'focus' && agent.id !== preferences().focusAgent">
           <header class="cabin-header">
-            <div><p class="eyebrow">{{ agent.id === 'claude' ? 'Claude Code' : 'OpenAI' }}</p><h2>{{ agent.name }}</h2></div>
+            <div class="cabin-identity"><button class="drag-handle" type="button" draggable="true" (dragstart)="startDrag(agent.id, $event)" (dragend)="draggedAgent.set(null)" [attr.aria-label]="'Mover ' + agent.name" [title]="'Arrastra para mover; usa Opciones para mover con teclado'">⠿</button><div><p class="eyebrow">{{ agent.id }}</p><h2>{{ agent.name }}</h2></div></div>
+            <div class="cabin-controls">
+              <label class="cabin-select" [title]="'Seleccionar ' + agent.name"><input type="checkbox" [checked]="selectedAgents().includes(agent.id)" (change)="selectAgent(agent.id)" [attr.aria-label]="'Seleccionar ' + agent.name" /></label>
+              <details class="cabin-options"><summary [attr.aria-label]="'Opciones de ' + agent.name" title="Opciones de la cabina">⋯</summary><div class="cabin-menu">
+                <button type="button" (click)="cabinAction(agent.id, 'focus', $event)">Enfocar {{ agent.name }}</button>
+                <button type="button" (click)="cabinAction(agent.id, 'automatic', $event)">Vista automática</button>
+                <button type="button" (click)="cabinAction(agent.id, 'row', $event)">Vista en fila</button>
+                <button type="button" (click)="cabinAction(agent.id, 'density', $event)">{{ preferences().density === 'compact' ? 'Ampliar cabinas' : 'Compactar cabinas' }}</button>
+                <button type="button" [disabled]="i === 0" (click)="cabinAction(agent.id, 'up', $event)" [attr.aria-label]="'Subir ' + agent.name">Mover antes</button>
+                <button type="button" [disabled]="i === visibleProfiles().length - 1" (click)="cabinAction(agent.id, 'down', $event)" [attr.aria-label]="'Bajar ' + agent.name">Mover después</button>
+                <button type="button" (click)="cabinAction(agent.id, 'hide', $event)">Ocultar {{ agent.name }}</button>
+              </div></details>
+            </div>
             <span class="status-pill" [attr.data-status]="mascotStateFor(agent.id)"><i aria-hidden="true"></i>{{ statusLabel(mascotStateFor(agent.id)) }}</span>
           </header>
           <div class="cabin-scene">
-            @if (agent.id === 'claude') { <ao-chispa class="cabin-mascot" [state]="mascotStateFor('claude')"></ao-chispa> }
-            @if (agent.id === 'codex') { <ao-nodo class="cabin-mascot" [state]="mascotStateFor('codex')"></ao-nodo> }
+            @switch (agent.mascot) {
+              @case ('chispa') { <ao-chispa class="cabin-mascot" [state]="mascotStateFor(agent.id)"></ao-chispa> }
+              @case ('nodo') { <ao-nodo class="cabin-mascot" [state]="mascotStateFor(agent.id)"></ao-nodo> }
+              @case ('astro') { <ao-astro class="cabin-mascot" [state]="mascotStateFor(agent.id)"></ao-astro> }
+              @case ('hondo') { <ao-hondo class="cabin-mascot" [state]="mascotStateFor(agent.id)"></ao-hondo> }
+            }
             <section class="now-card" aria-label="Ahora">
               <span class="section-label">Ahora</span>
               <strong>{{ stateFor(agent.id).title }}</strong>
@@ -73,8 +104,7 @@
       <div class="filters" aria-label="Filtros de eventos">
         <div class="agent-filters" role="group" aria-label="Filtrar por agente">
           <button type="button" [class.selected]="agentFilter() === 'all'" [attr.aria-pressed]="agentFilter() === 'all'" (click)="onAgentFilter('all')">Todos</button>
-          <button type="button" [class.selected]="agentFilter() === 'claude'" [attr.aria-pressed]="agentFilter() === 'claude'" (click)="onAgentFilter('claude')">Claude</button>
-          <button type="button" [class.selected]="agentFilter() === 'codex'" [attr.aria-pressed]="agentFilter() === 'codex'" (click)="onAgentFilter('codex')">Codex</button>
+          @for (agent of visibleProfiles(); track agent.id) { <button type="button" [class.selected]="agentFilter() === agent.id" [attr.aria-pressed]="agentFilter() === agent.id" (click)="onAgentFilter(agent.id)">{{ agent.name }}</button> }
         </div>
         <label>Sesión<select [value]="sessionFilter()" (change)="onSessionFilter($event)"><option value="all">Todas</option>@for (session of sessions(); track session.id) { <option [value]="session.id">{{ session.agent }} · {{ shortCwd(session.cwd) }}</option> }</select></label>
         <label>Tipo<select [value]="typeFilter()" (change)="onTypeFilter($event)"><option value="all">Todos</option>@for (type of eventTypes; track type) { <option [value]="type">{{ typeLabel(type) }}</option> }</select></label>
@@ -85,8 +115,8 @@
 
       @if (events().length === 0) {
         <section class="empty-state" aria-labelledby="empty-title">
-          <ao-vigia class="empty-mascot" [state]="'sleeping'" [claudeState]="'sleeping'" [codexState]="'sleeping'"></ao-vigia>
-          <div><p class="eyebrow">Vigía está esperando</p><h3 id="empty-title">Conecta tus agentes</h3><p>Instala los hooks de Claude Code y activa los de Codex para que las sesiones aparezcan aquí.</p>
+          <ao-michi class="empty-mascot" [state]="'sleeping'" [lights]="0"></ao-michi>
+          <div><p class="eyebrow">Michi está esperando</p><h3 id="empty-title">Conecta tus agentes</h3><p>Configura las integraciones de tus agentes para que las sesiones aparezcan aquí.</p>
             <div class="setup-agent"><strong>Claude Code y Codex</strong><div class="command-row"><code>node integrations/wire-up.mjs</code><button type="button" (click)="copyCommand('node integrations/wire-up.mjs')" aria-label="Copiar comando wire-up">Copiar</button></div><div class="command-row"><code>node integrations/wire-up.mjs --apply</code><button type="button" (click)="copyCommand('node integrations/wire-up.mjs --apply')" aria-label="Copiar comando wire-up apply">Copiar</button></div><p>En Codex, ejecuta <code>/hooks</code> y confía en los hooks de Overseer.</p></div>
             <div class="command-row"><code>node integrations/doctor.mjs</code><button type="button" (click)="copyCommand('node integrations/doctor.mjs')" aria-label="Copiar comando doctor">Copiar</button></div>
           </div>
@@ -97,9 +127,9 @@
         <div #eventViewport class="event-viewport" role="region" aria-label="Eventos" (scroll)="onScroll($event)">
           <div class="virtual-spacer" [style.height.px]="filteredEvents().length * 76">
             @for (row of visibleEvents(); track eventKeyForTemplate(row.event)) {
-              <button class="timeline-row" type="button" [class.agent-claude]="row.event.agent === 'claude'" [class.agent-codex]="row.event.agent === 'codex'" [style.transform]="'translateY(' + row.offset + 'px)'" (click)="openDetail(row.event, $any($event.currentTarget))">
+              <button class="timeline-row" type="button" [attr.data-agent]="row.event.agent" [style.transform]="'translateY(' + row.offset + 'px)'" (click)="openDetail(row.event, $any($event.currentTarget))">
                 <time class="tabular">{{ eventTime(row.event.ts) }}</time>
-                <span class="event-agent">{{ row.event.agent === 'claude' ? 'Claude' : 'Codex' }}</span>
+                <span class="event-agent">{{ agentName(row.event.agent) }}</span>
                 <span class="event-type" [attr.data-type]="row.event.type">{{ typeLabel(row.event.type) }}</span>
                 <span class="event-copy"><strong>{{ row.event.tool && row.event.type === 'tool_use' ? row.event.tool + ' · ' : '' }}{{ row.event.title }}</strong>@if (row.event.detail) { <code>{{ row.event.detail }}</code> }</span>
                 <span class="row-arrow" aria-hidden="true">›</span>
@@ -121,7 +151,7 @@
     <header class="detail-header"><div><p class="eyebrow">Detalle del evento</p><h2 id="detail-title">Detalle del evento: {{ detailTitle() }}</h2></div><button class="icon-button" type="button" (click)="closeDetail()" aria-label="Cerrar detalle">×</button></header>
     <div class="detail-actions"><button class="secondary-button" type="button" (click)="copyDetail()">Copiar evento</button><button class="secondary-button" type="button" [disabled]="!event.session_id" (click)="selectSession({ id: event.session_id || '', agent: event.agent, started_at: event.ts, last_event_at: event.ts, state: 'active' })">Filtrar esta sesión</button></div>
     <dl class="detail-fields">
-      <div><dt>Agente</dt><dd>{{ event.agent === 'claude' ? 'Claude Code' : 'Codex' }}</dd></div><div><dt>Tipo</dt><dd>{{ typeLabel(event.type) }} <code>{{ event.type }}</code></dd></div>
+      <div><dt>Agente</dt><dd>{{ agentName(event.agent) }}</dd></div><div><dt>Tipo</dt><dd>{{ typeLabel(event.type) }} <code>{{ event.type }}</code></dd></div>
       <div><dt>Fecha</dt><dd class="tabular">{{ event.ts }}</dd></div><div><dt>ID</dt><dd>{{ event.id ?? '—' }}</dd></div><div><dt>UID</dt><dd>{{ event.uid || '—' }}</dd></div>
       <div><dt>Sesión</dt><dd>{{ event.session_id || '—' }}</dd></div><div><dt>Sesión madre</dt><dd>{{ event.parent_session_id || '—' }}</dd></div><div><dt>Origen</dt><dd>{{ event.source || '—' }}</dd></div>
       <div><dt>Herramienta</dt><dd>{{ event.tool || '—' }}</dd></div><div><dt>Estado</dt><dd>{{ event.status || '—' }}</dd></div>
@@ -135,11 +165,12 @@
   <div class="modal-backdrop" (click)="toggleHelp()">
     <section #helpDialog class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" (click)="$event.stopPropagation()">
       <header><div><p class="eyebrow">Ayuda rápida</p><h2 id="help-title">Atajos de teclado</h2></div><button class="icon-button" type="button" (click)="toggleHelp()" aria-label="Cerrar ayuda">×</button></header>
-      <dl><div><dt><kbd>/</kbd></dt><dd>Enfocar búsqueda</dd></div><div><dt><kbd>1</kbd></dt><dd>Filtrar Claude</dd></div><div><dt><kbd>2</kbd></dt><dd>Filtrar Codex</dd></div><div><dt><kbd>0</kbd></dt><dd>Mostrar todos</dd></div><div><dt><kbd>P</kbd></dt><dd>Pausar o reanudar línea de tiempo</dd></div><div><dt><kbd>C</kbd></dt><dd>Activar o desactivar modo calma</dd></div><div><dt><kbd>Esc</kbd></dt><dd>Cerrar panel o ayuda</dd></div></dl>
+      <dl><div><dt><kbd>/</kbd></dt><dd>Enfocar búsqueda</dd></div><div><dt><kbd>1–4</kbd></dt><dd>Filtrar agentes por posición</dd></div><div><dt><kbd>0</kbd></dt><dd>Mostrar todos</dd></div><div><dt><kbd>P</kbd></dt><dd>Pausar o reanudar línea de tiempo</dd></div><div><dt><kbd>C</kbd></dt><dd>Activar o desactivar modo calma</dd></div><div><dt><kbd>Esc</kbd></dt><dd>Cerrar panel o ayuda</dd></div></dl>
       <p class="quiet">Los atajos no se activan mientras escribes en un campo.</p>
     </section>
   </div>
 }
 
 <div class="sr-only" aria-live="polite" aria-atomic="true">{{ mascotState.announcement() }}</div>
-<svg id="mascot-envelope" viewBox="0 0 32 24" aria-hidden="true"><path d="M2 4h28v17H2z" fill="var(--fg)" stroke="var(--line-strong)" stroke-width="1.5"/><path d="m3 5 13 10L29 5" fill="none" stroke="var(--codex-accent)" stroke-width="2" stroke-linejoin="round"/></svg>
+<div class="sr-only" aria-live="polite" aria-atomic="true">{{ reorderAnnouncement() }}</div>
+<svg id="mascot-envelope" viewBox="0 0 32 24" aria-hidden="true"><path d="M2 4h28v17H2z" fill="var(--fg)" stroke="var(--line-strong)" stroke-width="1.5"/><path d="m3 5 13 10L29 5" fill="none" stroke="var(--codex)" stroke-width="2" stroke-linejoin="round"/></svg>

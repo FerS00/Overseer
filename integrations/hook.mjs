@@ -4,14 +4,14 @@ import { redactText } from './redact.mjs';
 import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 
-const AGENTS = new Set(['claude', 'codex']);
+const AGENTS = new Set(['claude', 'codex', 'antigravity', 'deepseek']);
 const trunc = (value, limit = 2000) => redactText(String(value ?? '')).slice(0, limit);
 const stable = (value) => createHash('sha256').update(JSON.stringify(value ?? ''), 'utf8').digest('hex');
 
 function inputText(input) {
   if (typeof input === 'string') return input;
   if (!input || typeof input !== 'object') return input == null ? '' : String(input);
-  for (const key of ['command', 'file_path', 'path', 'pattern', 'description', 'query', 'relative_workspace_path']) {
+  for (const key of ['command', 'CommandLine', 'file_path', 'AbsolutePath', 'TargetFile', 'SearchPath', 'path', 'pattern', 'description', 'query', 'relative_workspace_path']) {
     if (input[key] != null) return Array.isArray(input[key]) ? input[key].join(' ') : String(input[key]);
   }
   return JSON.stringify(input);
@@ -24,8 +24,10 @@ function outputText(value) {
   return value == null ? '' : String(value);
 }
 
-export function convertHook(agent, data) {
+export function convertHook(agent, data, eventName) {
   if (!AGENTS.has(agent) || !data || typeof data !== 'object' || Array.isArray(data)) return null;
+  if (agent === 'antigravity') return convertAntigravity(data, eventName);
+  if (agent === 'deepseek') return convertDeepSeek(data);
   const name = String(data.hook_event_name || '');
   const session = String(data.session_id || '');
   const turn = String(data.turn_id || '');
@@ -52,6 +54,52 @@ export function convertHook(agent, data) {
     uid: eventUid(agent, session, event.source_key), ts: new Date().toISOString() };
 }
 
+function convertAntigravity(data, eventName) {
+  const name = String(eventName || data.hook_event_name || data.hookEventName || data.event || '');
+  const session = String(data.conversationId || data.session_id || '');
+  const tool = String(data.toolCall?.name || data.toolName || data.tool_name || '');
+  const callId = String(data.toolCall?.id || data.toolCallId || (data.stepIdx != null ? `step:${data.stepIdx}` : ''));
+  const input = data.toolCall?.args ?? data.toolInput ?? data.tool_input;
+  const output = data.toolResponse ?? data.tool_response ?? data.output;
+  let event;
+  if (name === 'PreInvocation') event = { type: 'thinking', source_key: `pre-invocation:${data.invocationId ?? data.invocationNum ?? stable(data)}`, title: 'Preparando respuesta', detail: '', meta: { model: data.modelName } };
+  else if (name === 'PreToolUse') event = { type: 'tool_use', source_key: `${callId || stable(input)}:pre`, tool, title: `Llamando a ${tool || 'herramienta'}`, detail: trunc(inputText(input)), meta: { call_id: callId } };
+  else if (name === 'PostToolUse') event = { type: 'tool_result', source_key: `${callId || stable(data)}:post`, tool, status: data.error ? 'error' : 'success', title: data.error ? `${tool || 'Herramienta'} falló` : `${tool || 'Herramienta'} completada`, detail: trunc(data.error || (output == null ? inputText(input) : outputText(output))), meta: { call_id: callId, model: data.modelName } };
+  else if (name === 'PostInvocation') event = { type: 'thinking', source_key: `post-invocation:${data.invocationId ?? data.invocationNum ?? stable(data)}`, title: 'Respuesta generada', detail: '' };
+  else if (name === 'Stop') {
+    const failed = !!data.error || /error|fail/i.test(String(data.terminationReason || ''));
+    event = { type: failed ? 'error' : data.fullyIdle === false ? 'thinking' : 'turn_end',
+      source_key: `stop:${data.executionNum ?? data.invocationId ?? stable(data)}`,
+      title: failed ? 'Turno fallido' : data.fullyIdle === false ? 'Esperando tareas en segundo plano' : 'Turno finalizado',
+      detail: trunc(data.error || data.lastAssistantMessage || ''), meta: { termination_reason: trunc(data.terminationReason || '') } };
+  }
+  else return null;
+  return { ...event, agent: 'antigravity', source: 'hook', session_id: session || null,
+    uid: eventUid('antigravity', session, event.source_key), ts: new Date().toISOString(),
+    meta: { ...(event.meta || {}), cwd: data.workspacePaths?.[0] || data.cwd || null } };
+}
+
+function convertDeepSeek(data) {
+  const name = String(data.event || data.hook_event || data.type || data.name || '');
+  const session = String(data.sessionId || data.session_id || '');
+  const tool = String(data.tool || data.toolName || data.tool_name || '');
+  const callId = String(data.callId || data.call_id || '');
+  const sourceKey = callId ? `call:${callId}:${name}` : `${name}:${stable(data)}`;
+  const reason = typeof data.reason === 'object' ? data.reason?.kind : data.reason;
+  let event;
+  if (name === 'turn/start') event = { type: 'thinking', title: 'Turno iniciado', detail: trunc(data.content || '') };
+  else if (name === 'tool/call') event = { type: 'tool_use', tool, title: `Llamando a ${tool || 'herramienta'}`, detail: trunc(inputText(data.toolArgs ?? data.input ?? data.args ?? data.tool_input)) };
+  else if (name === 'tool/result') event = { type: 'tool_result', tool, status: data.toolError ? 'error' : 'success', title: data.toolError ? `${tool || 'Herramienta'} falló` : `${tool || 'Herramienta'} completada`, detail: trunc(outputText(data.toolError || data.content || data.result || data.output)) };
+  else if (name === 'approval/asked') event = { type: 'permission_request', title: 'Solicita permiso', detail: trunc(inputText(data.toolArgs ?? data.input ?? data.tool)) };
+  else if (name === 'turn/end') event = { type: reason === 'error' ? 'error' : 'turn_end', title: reason === 'error' ? 'Turno fallido' : 'Turno finalizado', detail: trunc(data.content || data.error || '') };
+  else if (name === 'agent/error') event = { type: 'error', title: 'Error del agente', detail: trunc(outputText(data.error || data.content || data.message)) };
+  else if (name === 'agent/status') event = { type: 'thinking', title: `Estado: ${String(data.status || 'actualizado')}` };
+  else return null;
+  return { ...event, agent: 'deepseek', source: 'hook', session_id: session || null,
+    parent_session_id: data.parentSessionId || data.parent_session_id || null, uid: eventUid('deepseek', session, sourceKey),
+    ts: new Date().toISOString(), meta: { cwd: data.cwd || null, call_id: callId } };
+}
+
 function readStdin(input, timeoutMs = 700) {
   return new Promise((resolve) => {
     let raw = ''; let settled = false;
@@ -64,21 +112,23 @@ function readStdin(input, timeoutMs = 700) {
   });
 }
 
-export async function runHook(agent, input = process.stdin, output = process.stdout) {
+export async function runHook(agent, input = process.stdin, output = process.stdout, eventName) {
+  let response = '{}';
   try {
     if (!AGENTS.has(agent)) return;
     const raw = await readStdin(input);
     if (raw != null) {
       try {
         const parsed = JSON.parse(raw.replace(/^\uFEFF/, '').trim() || 'null');
-        const event = convertHook(agent, parsed);
+        const event = convertHook(agent, parsed, eventName);
         if (event) emit(event);
+        if (agent === 'antigravity' && (eventName === 'Stop' || parsed?.event === 'Stop' || parsed?.hook_event_name === 'Stop')) response = JSON.stringify({ decision: 'allow' });
       } catch { /* Entrada inválida: el hook no interrumpe al agente. */ }
     }
   } catch { /* Fallo silencioso. */ }
-  finally { try { output.write('{}'); } catch { } }
+  finally { try { output.write(response); } catch { } }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  runHook(process.argv[2]).catch(() => { try { process.stdout.write('{}'); } catch { } });
+  runHook(process.argv[2], process.stdin, process.stdout, process.argv[3]).catch(() => { try { process.stdout.write('{}'); } catch { } });
 }

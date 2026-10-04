@@ -22,6 +22,12 @@ agent-ops:
   cors: ${AGENT_OPS_CORS:http://localhost:4200,http://127.0.0.1:4200}
   codex-sessions: ${AGENT_OPS_CODEX_SESSIONS:${user.home}/.codex/sessions}
   codex-watcher-enabled: ${AGENT_OPS_CODEX_WATCHER_ENABLED:true}
+  agents:
+    claude-home: ${AGENT_OPS_CLAUDE_HOME:${user.home}/.claude}
+    codex-home: ${AGENT_OPS_CODEX_HOME:${user.home}/.codex}
+    antigravity-home: ${AGENT_OPS_ANTIGRAVITY_HOME:${user.home}/.gemini/config}
+    deepseek-home: ${AGENT_OPS_DEEPSEEK_HOME:${user.home}/.dsh/profiles}
+  agent-detection-interval-ms: ${AGENT_OPS_AGENT_DETECTION_INTERVAL_MS:300000}
   token-file: ${AGENT_OPS_TOKEN_FILE:${user.home}/.agent-ops/token}
   retention-days: ${AGENT_OPS_RETENTION_DAYS:14}
   session-idle-minutes: ${AGENT_OPS_SESSION_IDLE_MINUTES:10}

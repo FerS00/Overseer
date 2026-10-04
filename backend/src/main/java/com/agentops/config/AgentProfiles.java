@@ -9,10 +9,14 @@ public final class AgentProfiles {
                         Map<String, String> configuration) { }
 
   private static final List<Profile> ALL = List.of(
-      new Profile("claude", "Claude Code", "#EE8B66", "chispa", List.of("hooks"),
+      new Profile("claude", "Claude Code", "#E5774A", "chispa", List.of("hooks"),
           Map.of("hook", "node hook.mjs claude")),
       new Profile("codex", "Codex", "#8FA2FF", "nodo", List.of("hooks", "rollouts"),
-          Map.of("hook", "node hook.mjs codex", "rollouts", "AGENT_OPS_CODEX_SESSIONS")));
+          Map.of("hook", "node hook.mjs codex", "rollouts", "AGENT_OPS_CODEX_SESSIONS")),
+      new Profile("antigravity", "Antigravity", "#F28BC8", "astro", List.of("hooks"),
+          Map.of("hook", "node hook.mjs antigravity")),
+      new Profile("deepseek", "DeepSeek Harness", "#5CC8F5", "hondo", List.of("hooks"),
+          Map.of("hook", "node hook.mjs deepseek")));
 
   private AgentProfiles() { }
   public static List<Profile> all() { return ALL; }

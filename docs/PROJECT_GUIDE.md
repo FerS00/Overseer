@@ -44,7 +44,7 @@ AGENT_OPS_CODEX_SESSIONS_DIR=/home/<you>/.codex/sessions
 
 The UI is at `http://127.0.0.1:8787`. Compose publishes the port on host loopback, mounts the event and Codex session directories, stores H2 data in the `agent-ops-data` volume, and runs the application as an unprivileged user. Check readiness at `http://127.0.0.1:8787/api/diagnostics` or with `docker compose ps` and `docker compose logs agent-ops`.
 
-## Connect Claude Code and Codex
+## Connect supported agents
 
 Run these commands from the repository root:
 
@@ -56,7 +56,7 @@ node integrations/doctor.mjs
 
 The first command is a dry run that prints the proposed unified diff for review. Applying changes writes Claude Code hooks under `~/.claude/settings.json`; for Codex it enables `[features] hooks = true` and adds entries to `~/.codex/config.toml`. It makes timestamped backups before changing existing files and preserves unrelated hooks and Codex trust state. Open Codex Desktop, run `/hooks`, and trust the changed hooks. Codex rollouts remain visible from `~/.codex/sessions` even when hooks are untrusted. `doctor.mjs` checks the hook configuration, event-file writability, token-file presence without printing its contents, and a synthetic hook write.
 
-Claude Code and Codex hooks append to the NDJSON file; they do not call `/api/ingest` or send the ingest token. The backend also scans Codex rollout JSONL files, so Codex has two complementary sources. Configure their host paths with `AGENT_OPS_EVENTS_DIR` and `AGENT_OPS_CODEX_SESSIONS_DIR` when using Compose. Direct clients that POST to `/api/ingest` must send `X-Agent-Ops-Token`. See [Configuration](CONFIGURATION.md) for variables and defaults.
+All four supported agents' hooks append to the NDJSON file; they do not call `/api/ingest` or send the ingest token. The backend also scans Codex rollout JSONL files, so Codex has two complementary sources. Configure their host paths with `AGENT_OPS_EVENTS_DIR` and `AGENT_OPS_CODEX_SESSIONS_DIR` when using Compose. Direct clients that POST to `/api/ingest` must send `X-Agent-Ops-Token`. See [Configuration](CONFIGURATION.md) for variables and defaults.
 
 The optional Claude stream normalizer can be used in a pipeline when a Claude command is already producing stream JSON:
 
@@ -76,32 +76,35 @@ The browser-only demo can also be opened with `?demo=1`; it uses generated in-me
 
 ## Dashboard controls
 
-The dark dashboard shows Claude Code and Codex cabins, each agent's current mascot state, recent action, event and tool counts, and sessions. The timeline supports agent, session, type, and text filters; event detail; older-page loading; and pause/resume. The page retains up to 3,000 timeline events in the client and virtualizes visible rows. Notifications are optional and can report permission requests and completed turns while the page is hidden.
+The dark dashboard shows the detected Claude Code, Codex, Antigravity, and DeepSeek Harness cabins, each agent's current mascot state, recent action, event and tool counts, and sessions. The timeline supports agent, session, type, and text filters; event detail; older-page loading; and pause/resume. The page retains up to 3,000 timeline events in the client and virtualizes visible rows. Notifications are optional and can report permission requests and completed turns while the page is hidden.
 
 Keyboard shortcuts are disabled while typing in a form field:
 
 | Key | Action |
 | :--- | :--- |
 | `/` | Focus event search. |
-| `1` | Filter to Claude. |
-| `2` | Filter to Codex. |
-| `0` | Show both agents. |
+| `1–4` | Filter the visible agent at that position. |
+| `0` | Show all agents. |
 | `P` | Pause or resume the timeline. |
 | `C` | Toggle calm mode. |
 | `Esc` | Close event detail or help. |
 | `?` | Open shortcut help. |
 
+Select cabin checkboxes to hide several agents together. Restore hidden agents with their recovery buttons. Drag the dotted handle to reorder, or use the cabin options for keyboard movement, focus, layout, and density. There is no permanent customization toolbar. See [direct cabin controls](CONFIGURATION.md#direct-cabin-controls).
+
 The nine mascot states are idle, thinking, reading, editing, running, permission, done, error, and sleeping. Reduced-motion preferences enable calm rendering automatically.
+
+For Antigravity, use `node integrations/wire-up.mjs --agents antigravity --apply`; each command supplies its event name because the client's stdin payload has no discriminator. For DeepSeek Harness, use `--agents deepseek --apply` with the existing desktop dsh-hooks profile. See [Configuration](CONFIGURATION.md) for client setup and verification limits.
 
 ## HTTP API
 
-The GET routes and SSE stream are read-only. Ingest is token-protected.
+The GET routes and SSE stream are read-only. Ingest is token-protected. `GET /api/preferences` reads the saved view; `PUT /api/preferences` saves its order, hiddenAgents, layout, density, and focusAgent locally.
 
 | Method | Path | Query / headers | Response |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/events` | `limit` (default 200, max 500), optional `agent`, `session`, `type`, `q`, `before` | Filtered event array. `before` is an exclusive timestamp cursor. |
 | `GET` | `/api/state` | — | Buffered event/tool counts, last event time, per-agent counts, and active sessions by agent. |
-| `GET` | `/api/agents` | — | The compiled Claude Code and Codex profiles and integration metadata. |
+| `GET` | `/api/agents` | — | The compiled four-agent catalog, detection status, and integration metadata. |
 | `GET` | `/api/sessions` | Optional `agent`, `active` | Sessions, including state and optional parent session. |
 | `GET` | `/api/diagnostics` | — | Discard counters, active event sources, and latest rollout path/time. |
 | `GET` | `/events` | `Last-Event-ID` header or `lastEventId` query parameter | Named `event` SSE messages with persisted replay. |
@@ -117,7 +120,7 @@ Ingest rejects a request body over 256 KiB or a batch over 500 events with `413`
 - **Frontend shows offline or reconnecting:** check that port `8787` is available and the backend started successfully. The Angular development proxy targets `127.0.0.1:8787`.
 - **Ingest returns `401`:** ensure the integration reads the same token file configured by `AGENT_OPS_TOKEN_FILE`; do not paste the token into logs or reports.
 - **Docker cannot start:** create `.env` from `.env.example`, then check `docker compose logs agent-ops`. If the mounted event directory cannot store the generated token, set `AGENT_OPS_TOKEN_FILE=/app/data/token` in `.env`.
-- **An event is not shown:** inspect `/api/diagnostics` for discard counters. Agent IDs are limited to Claude and Codex; malformed and duplicate records are discarded.
+- **An event is not shown:** inspect `/api/diagnostics` for discard counters. Supported agent IDs are `claude`, `codex`, `antigravity`, and `deepseek`; malformed and duplicate records are discarded.
 
 ## Checks and screenshots
 

@@ -7,6 +7,7 @@ import com.agentops.service.CodexSessionWatcher;
 import com.agentops.service.EventStoreService;
 import com.agentops.service.FileTailer;
 import com.agentops.service.RetentionService;
+import com.agentops.service.UiPreferencesService;
 import org.springframework.test.util.ReflectionTestUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.flywaydb.core.Flyway;
@@ -30,6 +31,7 @@ import java.util.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
@@ -77,6 +79,7 @@ class PhaseOneIntegrationTest {
     repository.deleteAll();
     jdbc.update("DELETE FROM ingest_offsets");
     jdbc.update("DELETE FROM agent_sessions");
+    jdbc.update("DELETE FROM ui_preferences");
     Path file = Path.of(properties.getEventsFile()); Files.createDirectories(file.getParent()); Files.deleteIfExists(file);
     Path root = Path.of(properties.getCodexSessions());
     if (Files.exists(root)) try (var paths = Files.walk(root)) { for (Path p : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(p); }
@@ -99,6 +102,23 @@ class PhaseOneIntegrationTest {
   }
 
   @Test
+  void viewPreferencesSurviveReloadAndServiceRecreation() throws Exception {
+    Map<String, Object> preferences = Map.of(
+        "agentOrder", List.of("deepseek", "claude", "codex", "antigravity"),
+        "hiddenAgents", List.of("codex"), "layout", "focus", "density", "compact", "focusAgent", "deepseek");
+
+    mockMvc.perform(put("/api/preferences").contentType("application/json").content(mapper.writeValueAsBytes(preferences)))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.agentOrder[0]").value("deepseek"));
+    mockMvc.perform(get("/api/preferences"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.agentOrder[0]").value("deepseek"))
+        .andExpect(jsonPath("$.hiddenAgents[0]").value("codex"))
+        .andExpect(jsonPath("$.layout").value("focus"))
+        .andExpect(jsonPath("$.density").value("compact"));
+
+    assertThat(new UiPreferencesService(jdbc, mapper).get()).isEqualTo(preferences);
+  }
+
+  @Test
   void migrationsCreateBaselineAndOffsetTables() {
     assertThat(FAKE_DOTENV).exists();
     assertThat(readFakeDotenv()).contains("AGENT_OPS_DB_DRIVER=com.mysql.cj.jdbc.Driver");
@@ -108,13 +128,14 @@ class PhaseOneIntegrationTest {
     } catch (Exception e) { throw new AssertionError(e); }
     var successfulVersions = Arrays.stream(flyway.info().applied())
         .filter(migration -> migration.getVersion() != null)
-        .filter(migration -> Set.of("1", "2", "3", "4").contains(migration.getVersion().getVersion()))
+        .filter(migration -> Set.of("1", "2", "3", "4", "5").contains(migration.getVersion().getVersion()))
         .filter(migration -> migration.getState() == MigrationState.SUCCESS)
         .count();
-    assertThat(successfulVersions).isEqualTo(4);
+    assertThat(successfulVersions).isEqualTo(5);
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'AGENT_EVENTS'", Integer.class)).isEqualTo(1);
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'INGEST_OFFSETS'", Integer.class)).isEqualTo(1);
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'AGENT_SESSIONS'", Integer.class)).isEqualTo(1);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'UI_PREFERENCES'", Integer.class)).isEqualTo(1);
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM INFORMATION_SCHEMA.INDEXES WHERE INDEX_NAME = 'IDX_AGENT_EVENTS_SESSION_ID'", Integer.class)).isEqualTo(1);
   }
 
@@ -317,11 +338,13 @@ class PhaseOneIntegrationTest {
   @Test
   void fixedAgentApiRejectsGeminiAndCountsTheDiscard() throws Exception {
     var profiles = mockMvc.perform(get("/api/agents")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-    assertThat(profiles).contains("claude", "codex", "Claude Code", "chispa", "nodo").doesNotContain("gemini");
+    assertThat(profiles).contains("claude", "codex", "antigravity", "deepseek", "Claude Code", "chispa", "nodo", "astro", "hondo");
     var parsedProfiles = mapper.readTree(profiles);
-    assertThat(parsedProfiles.size()).isEqualTo(2);
+    assertThat(parsedProfiles.size()).isEqualTo(4);
     assertThat(parsedProfiles.get(0).path("id").asText()).isEqualTo("claude");
     assertThat(parsedProfiles.get(1).path("id").asText()).isEqualTo("codex");
+    assertThat(parsedProfiles.get(2).path("id").asText()).isEqualTo("antigravity");
+    assertThat(parsedProfiles.get(3).path("id").asText()).isEqualTo("deepseek");
     long before = discardedCount("invalid_agent");
     String token = Files.readString(Path.of(properties.getTokenFile())).trim();
     Map<String, Object> unsupported = event("gemini", "phase2-gemini", "message");
@@ -448,6 +471,34 @@ class PhaseOneIntegrationTest {
             .param("before", Instant.now().minusSeconds(1800).toString()))
         .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
     assertThat(response).contains((String) raw.get("uid"), "Historical marker");
+  }
+
+  @Test
+  void allRegisteredAgentsRemainQueryableOutsideBufferAndAfterHistoryReload() throws Exception {
+    for (var profile : com.agentops.config.AgentProfiles.all()) {
+      Map<String, Object> raw = event(profile.id(), "persisted-" + profile.id(), "tool_result");
+      raw.put("session_id", "persisted-session-" + profile.id());
+      raw.put("ts", Instant.now().minusSeconds(3600).toString());
+      raw.put("title", "Persisted four-agent history");
+      repository.saveAndFlush(AgentEvent.fromMap(raw, mapper));
+      assertThat(store.getRecent(3000)).noneMatch(row -> raw.get("uid").equals(row.get("uid")));
+      String response = mockMvc.perform(get("/api/events").param("agent", profile.id())
+              .param("session", (String) raw.get("session_id")).param("type", "tool_result")
+              .param("q", "Persisted four-agent").param("before", Instant.now().minusSeconds(1800).toString()))
+          .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+      assertThat(response).contains((String) raw.get("uid"));
+    }
+    Map<String, Object> legacy = event("unregistered", "legacy-unregistered", "message");
+    repository.saveAndFlush(AgentEvent.fromMap(legacy, mapper));
+    var reloaded = new com.agentops.service.EventStoreService(repository,
+        new com.agentops.service.SseBroadcaster(), mapper, null, jdbc);
+    reloaded.loadHistory();
+    for (String id : java.util.List.of("claude", "codex", "antigravity", "deepseek")) {
+      assertThat(reloaded.getRecent(500, id, "persisted-session-" + id, null, null, null))
+          .anyMatch(row -> id.equals(row.get("agent")));
+    }
+    assertThat(reloaded.getRecent(500, null, null, null, "Persisted four-agent", null)).hasSize(4);
+    assertThat(reloaded.getRecent(500, "unregistered", null, null, null, null)).isEmpty();
   }
 
   @Test

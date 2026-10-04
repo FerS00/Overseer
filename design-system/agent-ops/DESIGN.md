@@ -1,18 +1,20 @@
 # Overseer — DESIGN.md
 
-> Fuente de verdad del diseño. Estado: **Aprobado (2026-10-02)**.
-> Prototipo de referencia: `design-system/agent-ops/prototype.html` (Artifact privado, versión 2).
+> Fuente de verdad del diseño. Estado: **Revisión 4 aprobada (2026-10-03)**.
+> Prototipo vigente: `design-system/agent-ops/prototype-v4.html`, versión 4c (Artifact privado `https://claude.ai/artifact/MqEJR3jWMfLHXpTPUSnWmh`).
+> Histórico: `design-system/agent-ops/prototype.html` (revisión 3).
+> La sección «Revisión 4» al final de este documento manda sobre las anteriores: mascotas, tokens de agente, escenario y reglas de marca.
 
 ## Fuentes
 
 - Refero: **No ejecutado.** No hay MCP de Refero conectado y el usuario no ha aportado un `DESIGN.md`. La dirección visual es propia.
 - ui-ux-pro-max: consulta `"developer tool realtime monitoring dashboard playful mascot dark"` (estilo *Dark Mode (OLED)*, tipografía JetBrains Mono + IBM Plex Sans) y reglas UX de animación (`--domain ux`). Su patrón de página («FAQ/Documentation Landing») no aplica a un panel de monitorización y se descarta. La búsqueda por stack `angular` + `animation` no encontró resultados en su base de datos.
-- Símbolos de los agentes (decisión del usuario, revisión 2): las mascotas de Claude Code y Codex **se inspiran** en los símbolos de cada producto (el destello radial terracota de Claude; el nudo de seis anillos de OpenAI y el prompt `>_` de terminal de Codex). Son reinterpretaciones dibujadas desde cero, no copias de los logotipos. No se verificó contra un archivo de icono oficial (no hay iconos de Codex ni de Claude instalados localmente).
+- *(Histórico, sustituido en la revisión 4 por personajes originales; ver «Revisión de marcas».)* Símbolos de los agentes (decisión del usuario, revisión 2): las mascotas de Claude Code y Codex **se inspiraban** en los símbolos de cada producto (el destello radial terracota de Claude; el nudo de seis anillos de OpenAI y el prompt `>_` de terminal de Codex). Son reinterpretaciones dibujadas desde cero, no copias de los logotipos. No se verificó contra un archivo de icono oficial (no hay iconos de Codex ni de Claude instalados localmente).
 - Coucou (`github.com/Louis-CFM/coucou`): inspiración de producto (mascotas reactivas que siguen el puntero). No se reutiliza código, nombre, personaje (Mochi), iconos, sonidos ni medios, que tienen todos los derechos reservados en `LICENSE-ASSETS.md`.
 
 ## Principios
 
-1. **Cada agente es un personaje reconocible.** La mascota recuerda al símbolo del agente a primera vista y añade cara, mirada y carácter propios. El proyecto tiene una tercera mascota que vigila a ambas.
+1. **Cada agente es un personaje reconocible.** Cada agente tiene un personaje original con silueta, color y movimiento propios; se reconoce por su cabina, su nombre y su color, no por parecerse al logotipo del producto. El usuario tiene su propia mascota, Michi, que vigila a todos.
 2. **El movimiento informa.** La animación cambia con el estado real del agente. Sin actividad, el movimiento es mínimo: respiración, parpadeo y un giro muy lento.
 3. **El estado nunca depende solo de la mascota.** Siempre hay una etiqueta de texto y un color semántico junto al personaje.
 4. **Solo modo oscuro.** No existe tema claro; la interfaz fija `color-scheme: dark`.
@@ -82,6 +84,8 @@ En la app Angular las fuentes se sirven localmente mediante `@fontsource` (sin G
 | Evento de la línea de tiempo | Hora · agente·tipo (color del agente) · texto + `code` | nuevo: entra deslizando 6 px |
 
 ## Mascotas
+
+> Histórico de la revisión 3. Chispa, Nodo y Vigía se sustituyen por los diseños de la sección «Revisión 4».
 
 ### Vigía — mascota del proyecto
 
@@ -154,7 +158,112 @@ En la app Angular las fuentes se sirven localmente mediante `@fontsource` (sin G
 
 - Do: derivar todo color de los tokens; mantener la etiqueta de estado junto a la mascota; probar cada estado en modo calma.
 - Do: dibujar las mascotas en SVG en línea como componentes Angular con la misma interfaz (`state`, `lookAt`, `react`).
-- Don't: incrustar los archivos de logotipo oficiales de Anthropic u OpenAI; las mascotas son reinterpretaciones dibujadas desde cero.
+- Don't: incrustar logotipos oficiales de Anthropic, OpenAI, Google o DeepSeek, imitar su silueta o su degradado característico, ni describir una mascota como «inspirada en» el logotipo o la mascota de un tercero.
 - Don't: copiar a Mochi ni recursos de Coucou.
 - Don't: añadir un tema claro; animar `width`, `height`, `top` o `left`; abrir más de un bucle de `requestAnimationFrame`.
 - Don't: mostrar datos de demostración sin la marca visible «datos de ejemplo».
+
+---
+
+## Revisión 4 (aprobada por el usuario, 2026-10-03)
+
+Petición del usuario: añadir Antigravity y DeepSeek Harness con sus mascotas, sustituir a Vigía por una mascota propia del usuario coherente con las de los agentes y hacer que la interfaz se adapte a los agentes instalados en cada equipo (1 a 4), con orden y vista configurables. Después pidió eliminar los riesgos de marca de todas las mascotas, incluidas las ya implementadas.
+
+Prototipo: `prototype-v4.html`, versión 4c (Artifact privado `https://claude.ai/artifact/MqEJR3jWMfLHXpTPUSnWmh`). Historial: 4a (Arco pixel art y Hondo con surtidor, rechazado por infantil) → 4b (estrella estilo Gemini y ballena con cola curvada; descartada en la revisión de marcas) → 4c (diseños originales, aprobada).
+
+### Revisión de marcas (2026-10-03)
+
+El repositorio es público (`github.com/FerS00/Overseer`) y el `NOTICE` y el README actuales describen a Chispa y Nodo como «inspiradas en» la mascota de Claude Code y el icono de Codex. Un parecido evidente con la identidad visual de un producto, unido a esa declaración, puede sugerir afiliación o respaldo. Esto no es asesoramiento jurídico; es la mitigación de diseño razonable.
+
+| Mascota | Antes | Riesgo | Ahora (4c) |
+|---|---|---|---|
+| Chispa (Claude Code) | Bloque terracota pixel art con patas, muy cercano a la mascota oficial de Claude Code | Alto | **Brasa**: llama pixel art con núcleo claro y punta que parpadea. Solo comparte con el producto un tono cálido, que no es distintivo por sí solo. |
+| Nodo (Codex) | Nube festoneada con `>_` en degradado lavanda → azul, casi igual al icono de Codex | Alto | **Hexágono de red** con tres puertos conectados y degradado índigo. El glifo `>_` es la convención genérica de terminal y solo aparece en reposo. |
+| Astro (Antigravity) | Estrella de cuatro puntas cóncava con degradado azul → rosa (4b), muy asociada a Gemini | Alto | **Planetoide con anillo** que levita. La levitación remite a «antigravedad» sin usar ningún símbolo de Google. |
+| Hondo (DeepSeek Harness) | Ballena azul con la cola curvada sobre el lomo (4b), como el logotipo de DeepSeek | Medio | **Ballena geométrica** con aletas horizontales, pliegues ventrales y tonos turquesa. La ballena como animal es genérica; se descarta la pose y el azul del logotipo. |
+| Michi (usuario) | — | Bajo | Gato pixel art original. |
+| Vigía (retirada) | Faro propio | Bajo | Se retira de la interfaz. |
+
+Reglas que se derivan:
+
+- Las mascotas son **personajes originales asignados** a un agente, no reinterpretaciones de su logotipo. Ningún texto público dice «inspirada en» un logotipo o una mascota de terceros.
+- Los nombres de los productos solo se usan para identificar con qué agente es compatible cada cabina (uso nominativo), en texto plano y sin logotipos.
+- `NOTICE` y README declaran que el proyecto no está afiliado a Anthropic, OpenAI, Google ni DeepSeek, que no incluye logotipos oficiales y que las mascotas son originales. Ese cambio se hace en la fase 14, junto con el código, para que el texto público no contradiga lo que se ve.
+- Las capturas `docs/images/mascots-claude.png`, `mascots-codex.png` y `vigia.png` se sustituyen en la fase 16. Las versiones anteriores seguirán en el historial de Git; reescribir la historia de un repositorio público no está previsto y requeriría una decisión aparte.
+
+### Tokens nuevos
+
+| Token | Valor | Rol | Contraste sobre `--surface` / `--stage` | Origen |
+|---|---|---|---|---|
+| `--antigravity` | `#F28BC8` | Nombre y acentos de Antigravity | 8,08 / 8,37 | propio |
+| `--deepseek` | `#5CC8F5` | Nombre y acentos de DeepSeek Harness | 9,59 / 9,93 | propio |
+| `--codex` | `#8FA2FF` | Se unifica con el antiguo `--codex-accent` para que los cuatro agentes tengan un único color de acento | 7,63 / 7,90 | ajustado |
+
+Verificado con `check_contrast.py` el 2026-10-03. Los cuatro acentos se distinguen por tono (naranja, pervinca, rosa y cian) y ninguno coincide con los semánticos `--ok`, `--warn` y `--bad`.
+
+### Familia de mascotas
+
+Dos lenguajes alternos, con la misma interfaz (`state`, `lookAt`, `react`) y los mismos nueve estados:
+
+- **Pixel art 24×24** (`shape-rendering: crispEdges`, movimiento en celdas enteras): Chispa y Michi.
+- **Plano con degradado y cara de glifo blanco** (extremos redondeados, sin mejillas, bocas ni brillos): Nodo, Astro y Hondo. Pide permiso cambia el degradado a ámbar, error a rojo y durmiendo a una versión apagada.
+
+Nada de rasgos infantiles (rubor, sonrisas, gotas decorativas, ojos con brillo). El carácter sale de la silueta, el movimiento y el glifo.
+
+### Chispa — Claude Code (rediseño 4c)
+
+- **Concepto:** brasa en pixel art 24×24. Llama `#E5774A` con núcleo `#F6B26B`, base `#C25A34` y ojos `#1A1210`; la punta alterna entre dos formas.
+- **Estados:** en espera (la punta parpadea y se balancea); pensando (tres píxeles); leyendo (libro); editando (lápiz y núcleo que late); ejecutando (pies alternos, chispas que saltan y punta rápida); pide permiso (signo ámbar); terminó (salto, ojos `^ ^` y destellos); error (rojiza, ojos en X, temblor); durmiendo (sin punta, colores apagados, z).
+- **Puntero:** los ojos se desplazan en celdas enteras (−1, 0 o +1). **Clic:** salto en cuatro pasos durante 400 ms.
+
+### Nodo — Codex (rediseño 4c)
+
+- **Concepto:** hexágono de esquinas redondeadas con tres puertos (arriba, abajo a la izquierda y abajo a la derecha), como un nodo de red. Degradado `#B9B4FF` → `#7C74F2` → `#4B3FD1`; puertos `#C9C2FF`.
+- **Estados:** en espera (`>_` con cursor); pensando (tres puntos, los puertos laten); leyendo (el chevrón recorre); editando (cursor que se escribe); ejecutando (`>>_`, balanceo y puertos que parpadean); pide permiso (ámbar y `?`); terminó (verificación y pulso); error (rojo y X); durmiendo (apagado, ojos cerrados y z).
+- **Puntero:** la cara se desplaza ±6/±5 px y el hexágono se inclina hasta ±6°. **Clic:** escala 1 → 1,1 → 1.
+
+### Astro — Antigravity (rediseño 4c)
+
+- **Concepto:** planetoide que levita sobre su sombra, con un anillo inclinado que pasa por delante y por detrás. Degradado diagonal `#FFC2E2` → `#F28BC8` → `#9B6BE0`; anillo `#F7A8D6`; ojos en cápsula blanca.
+- **Estados:** en espera (flota y la sombra se encoge al subir); pensando (tres puntos y una luna en órbita); leyendo (los ojos recorren); editando (un ojo y cursor); ejecutando (el anillo gira en trazos, más alto y con estela); pide permiso (ámbar, `?`, balanceo); terminó (pulso, verificación y destellos); error (rojo, X, cae inclinado); durmiendo (apagado, posado, z).
+- **Puntero:** la cara se desplaza ±5/±4 px y el cuerpo se inclina hasta ±6°. **Clic:** escala 1 → 1,1 → 1.
+
+### Hondo — DeepSeek Harness (rediseño 4c)
+
+- **Concepto:** ballena geométrica de perfil con aletas caudales horizontales y dos pliegues ventrales. Degradado vertical `#8FE3F0` → `#2FA7C9` → `#1F6E9E`; un solo ojo de glifo.
+- **Estados:** en espera (deriva lenta); pensando (tres puntos); leyendo (el ojo recorre); editando (ojo, cursor y aleta que marca el ritmo); ejecutando (`»`, nado y estela); pide permiso (ámbar y `?`); terminó (verificación y chorro de tres trazos); error (rojo, X, temblor); durmiendo (apagada, línea, z).
+- **Puntero:** la cara se desplaza ±3 px y el cuerpo se inclina hasta ±4°. **Clic:** escala 1 → 1,1 → 1.
+
+### Michi — mascota del usuario (sustituye a Vigía)
+
+- **Concepto:** gato gris pizarra en pixel art 24×24, sentado de frente. Pelaje `#8E97B0`, sombra `#6E7790`, claro `#B9C1D6`, iris `#C9C2FF`, collar `#8B7CF6` (marca).
+- **Collar:** una luz por agente visible, en su color cuando trabaja o terminó, ámbar si pide permiso, roja si falla y apagada `#3A4256` en reposo. El número de luces sigue al número de agentes visibles (0 a 4).
+- **Estado global (prioridad):** alarma (algún error: temblor y `!`) > alerta (algún permiso: cola erguida, orejas arriba, `?`) > vigilando (algún agente activo: la cola oscila) > contento (alguno terminó y ninguno trabaja: ojos `^ ^`, salto) > dormido (todos duermen o no hay agentes).
+- **Puntero:** las pupilas se desplazan una celda. **Orejas:** se giran una celda hacia la cabina del último agente con actividad.
+- **Usos:** logotipo, favicon, cabecera, estado vacío y, en escritorio, icono de bandeja.
+
+### Escenario dinámico
+
+| Agentes visibles | Disposición automática |
+|---|---|
+| 0 | Estado vacío con Michi dormido. Distingue entre «ningún agente detectado» (enlaza con `doctor.mjs`) y «todos ocultos». |
+| 1 | Una cabina ancha con la mascota a 240 px. |
+| 2 | Dos columnas. |
+| 3 | Tres columnas desde 1 100 px; por debajo, 2 + 1 con la tercera a todo el ancho. |
+| 4 | Rejilla 2 × 2. |
+
+- **Disposiciones:** Automática, Fila (todas en una fila; cuatro pasan a 2 × 2 por debajo de 1 100 px) y Foco (una cabina grande y el resto en fila debajo). Con menos de dos agentes solo existe la automática.
+- **Densidad:** Normal o Compacta (oculta «Probar estado» y el detalle, mascota a 96 px).
+- **Orden:** se arrastra desde el asa de la cabina o con los botones «Mover antes/después», que anuncian la nueva posición por `aria-live`. Cada cabina tiene también «Enfocar» y «Ocultar».
+- **Visibilidad:** un agente es visible si está **detectado** (lo decide el backend) y el usuario no lo ha ocultado. Un agente no detectado aparece atenuado en la barra «Agentes» y no se puede mostrar.
+- **Persistencia:** orden, ocultos, disposición, foco y densidad se guardan por equipo; en el prototipo, en `localStorage`.
+- **Mirada sin puntero:** tras 4,5 s cada mascota mira a la cabina siguiente en el orden actual (generaliza «Chispa y Nodo se miran»). El traspaso de turno (`handoff`) vuela entre cualquier par de cabinas visibles.
+- Por debajo de 860 px todo pasa a una columna; por debajo de 480 px la mascota y «Ahora» se apilan.
+
+### Desviaciones y pendientes
+
+| Punto | Detalle |
+|---|---|
+| 375 px | No verificado en esta revisión: el emulador del panel no aplicó el ancho real. Pendiente en la fase 15 con Playwright. |
+| Vigía | Se retira de la interfaz en la fase 14; su especificación de la revisión 3 se conserva arriba como histórico. |
+| Chispa y Nodo de la revisión 3 | Sustituidas por los rediseños 4c; las secciones anteriores quedan como histórico. |

@@ -74,7 +74,13 @@ async function installMocks(page, data) {
     if (url.pathname.endsWith('/api/events')) body = data;
     else if (url.pathname.endsWith('/api/sessions')) body = data.length ? sessions() : [];
     else if (url.pathname.endsWith('/api/state')) body = { total: data.length, tools: data.filter((item) => ['tool_use', 'tool_result'].includes(item.type)).length, agents: [] };
-    else if (url.pathname.endsWith('/api/agents')) body = [{ id: 'claude' }, { id: 'codex' }];
+    else if (url.pathname.endsWith('/api/agents')) body = [
+      { id: 'claude', name: 'Claude Code', mascot: 'chispa', color: '#E5774A', detected: true },
+      { id: 'codex', name: 'Codex', mascot: 'nodo', color: '#8FA2FF', detected: true },
+      { id: 'antigravity', name: 'Antigravity', mascot: 'astro', color: '#F28BC8', detected: true },
+      { id: 'deepseek', name: 'DeepSeek Harness', mascot: 'hondo', color: '#5CC8F5', detected: true },
+    ];
+    else if (url.pathname.endsWith('/api/preferences')) body = { agentOrder: ['claude', 'codex', 'antigravity', 'deepseek'], hiddenAgents: [], layout: 'automatic', density: 'normal', focusAgent: 'claude' };
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   });
 }
@@ -99,12 +105,15 @@ async function waitForFinalCabinStates(page) {
 }
 
 async function captureGrid(browser, agent, sourcePage) {
-  await sourcePage.getByRole('button', { name: 'Modo calma' }).click();
-  const mascot = agent === 'claude' ? 'ao-chispa' : 'ao-nodo';
+  const calm = sourcePage.getByRole('button', { name: 'Modo calma' });
+  if (await calm.getAttribute('aria-pressed') !== 'true') await calm.click();
+  const meta = { claude: ['Claude Code', 'chispa'], codex: ['Codex', 'nodo'], antigravity: ['Antigravity', 'astro'], deepseek: ['DeepSeek Harness', 'hondo'], michi: ['Overseer', 'michi'] }[agent];
+  const mascot = agent === 'michi' ? 'header ao-michi' : `ao-${meta[1]}`;
   const images = [];
   for (const state of states) {
-    await sourcePage.getByLabel(`Estado de ejemplo de ${agent === 'claude' ? 'Claude Code' : 'Codex'}`).selectOption(state);
-    await sourcePage.locator(`${mascot} svg[data-state="${state}"]`).waitFor();
+    for (const name of agent === 'michi' ? ['Claude Code', 'Codex', 'Antigravity', 'DeepSeek Harness'] : [meta[0]]) await sourcePage.getByLabel(`Estado de ejemplo de ${name}`).selectOption(state);
+    const globalState = agent === 'michi' && ['reading', 'editing', 'running'].includes(state) ? 'thinking' : state;
+    await sourcePage.locator(`${mascot} svg[data-state="${globalState}"]`).waitFor();
     await sourcePage.waitForTimeout(90);
     const buffer = await sourcePage.locator(mascot).screenshot({ animations: 'disabled' });
     images.push({ state, src: `data:image/png;base64,${buffer.toString('base64')}` });
@@ -115,9 +124,9 @@ async function captureGrid(browser, agent, sourcePage) {
     h1{margin:0 0 22px;font-size:28px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
     figure{margin:0;min-height:218px;padding:14px;border:1px solid #283147;border-radius:18px;background:#11151f;text-align:center}
     img{display:block;width:100%;height:166px;object-fit:contain}figcaption{margin-top:8px;color:#aeb9d5}
-  </style></head><body><h1>${agent === 'claude' ? 'Chispa · Claude Code' : 'Nodo · Codex'}</h1><div class="grid">${images.map(({ state, src }) => `<figure><img alt="${state}" src="${src}"><figcaption>${state}</figcaption></figure>`).join('')}</div></body></html>`);
+  </style></head><body><h1>${meta[1][0].toUpperCase() + meta[1].slice(1)} · ${meta[0]}</h1><div class="grid">${images.map(({ state, src }) => `<figure><img alt="${state}" src="${src}"><figcaption>${state}</figcaption></figure>`).join('')}</div></body></html>`);
   await grid.locator('.grid img').last().waitFor();
-  await grid.screenshot({ path: path.join(outputDir, agent === 'claude' ? 'mascots-claude.png' : 'mascots-codex.png') });
+  await grid.screenshot({ path: path.join(outputDir, agent === 'michi' ? 'michi.png' : `mascots-${meta[1]}.png`) });
   await grid.close();
 }
 
@@ -126,7 +135,18 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true });
 try {
   const overview = await openView(browser);
   await waitForFinalCabinStates(overview);
-  await overview.screenshot({ path: path.join(outputDir, 'overview.png') });
+  await overview.screenshot({ path: path.join(outputDir, 'overview.png'), fullPage: true });
+  await overview.getByLabel('Opciones de DeepSeek Harness', { exact: true }).click();
+  await overview.getByRole('button', { name: 'Ocultar DeepSeek Harness', exact: true }).click();
+  await expect(overview.locator('.cabin:visible')).toHaveCount(3);
+  await overview.screenshot({ path: path.join(outputDir, 'layout-three.png'), fullPage: true });
+  await overview.getByLabel('Opciones de Antigravity', { exact: true }).click();
+  await overview.getByRole('button', { name: 'Ocultar Antigravity', exact: true }).click();
+  await overview.getByLabel('Opciones de Codex', { exact: true }).click();
+  await overview.getByRole('button', { name: 'Ocultar Codex', exact: true }).click();
+  await expect(overview.locator('.cabin:visible')).toHaveCount(1);
+  await overview.screenshot({ path: path.join(outputDir, 'layout-one.png'), fullPage: true });
+  await overview.getByRole('button', { name: 'Mostrar todos', exact: true }).click();
   await overview.evaluate(() => window.scrollTo(0, 0));
   const viewport = overview.locator('.event-viewport');
   await viewport.evaluate((element) => { element.scrollTop = element.scrollHeight; });
@@ -147,9 +167,7 @@ try {
   await empty.close();
 
   const mascotPage = await openView(browser, { query: '?mascot-demo=1' });
-  await captureGrid(browser, 'claude', mascotPage);
-  await captureGrid(browser, 'codex', mascotPage);
-  await mascotPage.locator('header ao-vigia').screenshot({ path: path.join(outputDir, 'vigia.png'), animations: 'disabled' });
+  for (const agent of ['claude', 'codex', 'antigravity', 'deepseek', 'michi']) await captureGrid(browser, agent, mascotPage);
   await mascotPage.close();
 } finally {
   await browser.close();

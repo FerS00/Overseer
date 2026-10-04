@@ -62,6 +62,18 @@ describe('EventsService', () => {
         service.destroy();
     });
 
+    it('accepts all four catalog agents over SSE and still rejects unknown agents', () => {
+        const service = new EventsService();
+        const received: AgentEvent[] = [];
+        service.stream().subscribe((event) => received.push(event));
+        for (const agent of ['claude', 'codex', 'antigravity', 'deepseek'] as const) {
+            FakeEventSource.instances[0].send({ uid: `sse-${agent}`, ts: '', agent, type: 'thinking', title: agent });
+        }
+        FakeEventSource.instances[0].send({ uid: 'sse-invalid', ts: '', agent: 'unknown', type: 'thinking', title: 'invalid runtime payload' } as unknown as AgentEvent);
+        expect(received.map((event) => event.agent)).toEqual(['claude', 'codex', 'antigravity', 'deepseek']);
+        service.destroy();
+    });
+
     it('starts demo only when demo=1 is in the query string', () => {
         vi.useFakeTimers();
         history.replaceState({}, '', '?demo=1');

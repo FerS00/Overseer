@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, Subject } from 'rxjs';
 import { AgentEvent } from './models';
+import { AGENT_PROFILES } from './agent-profiles';
 
 export type ConnectionMode = 'live' | 'reconnecting' | 'offline' | 'demo';
 export type EventQuery = { limit?: number; before?: string; agent?: string; session?: string; type?: string; q?: string };
@@ -82,7 +83,7 @@ export class EventsService {
   }
 
   private accept(event: AgentEvent): void {
-    if (!event || (event.agent !== 'claude' && event.agent !== 'codex')) return;
+    if (!event || !AGENT_PROFILES.some((profile) => profile.id === event.agent)) return;
     if (event.uid) { if (this.seen.has(event.uid)) return; this.seen.add(event.uid); if (this.seen.size > 5000) this.seen.delete(this.seen.values().next().value as string); }
     this.events$.next(event);
   }

@@ -11,7 +11,17 @@ describe('Overseer interface state', () => {
   beforeEach(() => {
     events = new Subject<AgentEvent>();
     modes = new Subject();
-    vi.spyOn(window, 'fetch').mockImplementation(async () => new Response('[]'));
+    vi.spyOn(window, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith('/api/agents')) return new Response(JSON.stringify([
+        { id: 'claude', name: 'Claude Code', mascot: 'chispa', color: '#E5774A', detected: true },
+        { id: 'codex', name: 'Codex', mascot: 'nodo', color: '#8FA2FF', detected: true },
+        { id: 'antigravity', name: 'Antigravity', mascot: 'astro', color: '#F28BC8', detected: false },
+        { id: 'deepseek', name: 'DeepSeek Harness', mascot: 'hondo', color: '#5CC8F5', detected: false },
+      ]));
+      if (url.endsWith('/api/preferences')) return new Response(JSON.stringify({ agentOrder: ['claude', 'codex', 'antigravity', 'deepseek'], hiddenAgents: [], layout: 'automatic', density: 'normal', focusAgent: 'claude' }));
+      return new Response('[]');
+    });
     TestBed.configureTestingModule({
       imports: [AppComponent],
       providers: [{ provide: EventsService, useValue: {
@@ -29,11 +39,49 @@ describe('Overseer interface state', () => {
     fixture.destroy();
   });
 
+  it('serializes rapid preference saves and reports a failed HTTP save', async () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    const component = fixture.componentInstance;
+    const requests: Array<{ body: string; resolve: (response: Response) => void }> = [];
+    vi.mocked(window.fetch).mockImplementation((_url, init) => new Promise<Response>((resolve) => requests.push({ body: String(init?.body), resolve })));
+    const hidden = component.hideAgents(['claude']);
+    const restored = component.restoreAgents(['claude']);
+    await Promise.resolve();
+    expect(requests.length).toBe(1);
+    expect(JSON.parse(requests[0].body).hiddenAgents).toEqual(['claude']);
+    requests[0].resolve(new Response('{}', { status: 500 }));
+    await hidden;
+    expect(component.preferenceError()).toContain('servidor');
+    await Promise.resolve();
+    expect(requests.length).toBe(2);
+    expect(JSON.parse(requests[1].body).hiddenAgents).toEqual([]);
+    requests[1].resolve(new Response('{}'));
+    await restored;
+    expect(component.preferenceError()).toBe('');
+    expect(JSON.parse(localStorage.getItem('agent-ops-view')!).hiddenAgents).toEqual([]);
+    fixture.destroy();
+  });
+
   it('gives untitled events a type and abbreviated cwd fallback', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
     events.next({ uid: 'untitled', agent: 'claude', type: 'session_start', title: '', ts: '2026-10-02T10:00:00Z', meta: { cwd: 'C:/work/project-one' } });
     expect(fixture.componentInstance.events()[0].title).toBe('Inicio de sesión · project-one');
+    fixture.destroy();
+  });
+
+  it('normalizes historical Antigravity stops without relabeling tools or other agents', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+    for (const [uid, agent, type] of [['stop', 'antigravity', 'turn_end'], ['tool', 'antigravity', 'tool_result'], ['other', 'codex', 'turn_end']] as const) {
+      events.next({ uid, agent, type, title: 'NO_TOOL_CALL', ts: new Date().toISOString(), session_id: uid, meta: { termination_reason: 'NO_TOOL_CALL' } });
+    }
+    const records = fixture.componentInstance.events();
+    expect(records.find((event) => event.uid === 'stop')?.title).toBe('Turno finalizado');
+    expect(records.find((event) => event.uid === 'stop')?.meta?.['termination_reason']).toBe('NO_TOOL_CALL');
+    expect(records.find((event) => event.uid === 'tool')?.title).toBe('NO_TOOL_CALL');
+    expect(records.find((event) => event.uid === 'other')?.title).toBe('NO_TOOL_CALL');
+    expect(fixture.componentInstance.sessions().find((session) => session.id === 'stop')?.last_action).toBe('Turno finalizado');
     fixture.destroy();
   });
 
@@ -72,12 +120,12 @@ describe('Overseer interface state', () => {
     const component = fixture.componentInstance;
     const cabins = fixture.nativeElement.querySelectorAll('.cabin');
     expect(component.stateFor('claude').title).toBe('Edita ResumenCarrito.ts');
-    expect(component.mascotState.states().claude).toBe('editing');
+    expect(component.mascotState.states()['claude']).toBe('editing');
     expect(cabins[0].querySelector('.now-card strong')?.textContent).toContain('Edita ResumenCarrito.ts');
     expect(cabins[0].querySelector('.status-pill')?.textContent).toContain('Editando');
     expect(cabins[0].querySelector('ao-chispa svg')?.getAttribute('data-state')).toBe('editing');
     expect(component.stateFor('codex').title).toBe('Ejecuta las pruebas del carrito');
-    expect(component.mascotState.states().codex).toBe('running');
+    expect(component.mascotState.states()['codex']).toBe('running');
     expect(cabins[1].querySelector('.now-card strong')?.textContent).toContain('Ejecuta las pruebas del carrito');
     expect(cabins[1].querySelector('.status-pill')?.textContent).toContain('Ejecutando');
     expect(cabins[1].querySelector('ao-nodo svg')?.getAttribute('data-state')).toBe('running');

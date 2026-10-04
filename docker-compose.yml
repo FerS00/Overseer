@@ -17,6 +17,11 @@ services:
       AGENT_OPS_TOKEN_FILE: ${AGENT_OPS_TOKEN_FILE:-/events/token}
       AGENT_OPS_CODEX_SESSIONS: /codex-sessions
       AGENT_OPS_CODEX_WATCHER_ENABLED: ${AGENT_OPS_CODEX_WATCHER_ENABLED:-true}
+      AGENT_OPS_AGENTS: ${AGENT_OPS_AGENTS:-}
+      AGENT_OPS_CLAUDE_HOME: ${AGENT_OPS_CLAUDE_HOME:-/home/overseer/.claude}
+      AGENT_OPS_CODEX_HOME: ${AGENT_OPS_CODEX_HOME:-/home/overseer/.codex}
+      AGENT_OPS_ANTIGRAVITY_HOME: ${AGENT_OPS_ANTIGRAVITY_HOME:-/home/overseer/.gemini/config}
+      AGENT_OPS_DEEPSEEK_HOME: ${AGENT_OPS_DEEPSEEK_HOME:-/home/overseer/.dsh/profiles}
     volumes:
       - "${AGENT_OPS_EVENTS_DIR:-./.agent-ops}:/events"
       - "${AGENT_OPS_CODEX_SESSIONS_DIR:-./.codex-sessions}:/codex-sessions:ro"

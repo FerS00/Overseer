@@ -5,12 +5,11 @@ import { JsonPipe } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { EventsService, ConnectionMode } from './events.service';
 import { AgentEvent, AgentSession, AgentState } from './models';
-import { AGENT_PROFILES } from './agent-profiles';
-import { ChispaComponent, NodoComponent, VigiaComponent } from './mascots/mascot-components';
+import { AGENT_PROFILES, AgentMeta } from './agent-profiles';
+import { AstroComponent, ChispaComponent, HondoComponent, MichiComponent, NodoComponent } from './mascots/mascot-components';
 import { MascotEngine } from './mascots/mascot-engine.service';
-import { compareEventRecency, MascotState, MASCOT_STATES, MASCOT_STATE_LABELS, vigiaState } from './mascots/mascot-state';
+import { compareEventRecency, MascotState, MASCOT_STATES, MASCOT_STATE_LABELS } from './mascots/mascot-state';
 import { MascotHandoff, MascotStateService } from './mascots/mascot-state.service';
-
 const EVENT_TYPES = ['session_start', 'user_prompt', 'thinking', 'message', 'tool_use', 'tool_result', 'handoff', 'turn_end', 'session_end', 'error', 'permission_request', 'note'] as const;
 const TYPE_LABELS: Record<string, string> = {
   session_start: 'Inicio de sesión', user_prompt: 'Prompt', thinking: 'Pensando', message: 'Mensaje', tool_use: 'Herramienta',
@@ -21,31 +20,41 @@ const MAX_EVENTS = 3000;
 const MAX_PAUSED_EVENTS = 250;
 const ROW_HEIGHT = 76;
 const OVERSCAN = 8;
-
+interface ViewPreferences { agentOrder: string[]; hiddenAgents: string[]; layout: string; density: string; focusAgent: string; }
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [VigiaComponent, ChispaComponent, NodoComponent, JsonPipe],
+  imports: [MichiComponent, ChispaComponent, NodoComponent, AstroComponent, HondoComponent, JsonPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app.component.html',
   host: { '[class.calm-mode]': 'mascotEngine.calm()' },
 })
 export class AppComponent implements OnInit, OnDestroy {
-  readonly profiles = AGENT_PROFILES;
+  readonly profiles = signal<AgentMeta[]>(AGENT_PROFILES.slice(0, 2));
+  readonly agentIds: string[] = AGENT_PROFILES.map((p) => p.id);
+  readonly detectedProfiles = computed(() => this.profiles().filter((profile) => profile.detected));
+  readonly preferences = signal<ViewPreferences>({ agentOrder: [...this.agentIds], hiddenAgents: [], layout: 'automatic', density: 'normal', focusAgent: 'claude' });
+  readonly visibleProfiles = computed(() => this.preferences().agentOrder.map((id) => this.profiles().find((p) => p.id === id)).filter((p): p is AgentMeta => !!p && p.detected !== false && !this.preferences().hiddenAgents.includes(p.id)));
   readonly mascotOptions = MASCOT_STATES;
   readonly eventTypes = EVENT_TYPES;
   readonly mode = signal<ConnectionMode>('reconnecting');
   readonly events = signal<AgentEvent[]>([]);
   readonly pauseBuffer = signal<AgentEvent[]>([]);
   readonly sessions = signal<AgentSession[]>([]);
-  readonly states = signal<Record<'claude' | 'codex', AgentState>>({ claude: this.freshState(), codex: this.freshState() });
-  readonly agentFilter = signal<'all' | 'claude' | 'codex'>('all');
+  readonly states = signal<Record<string, AgentState>>(Object.fromEntries(this.agentIds.map((id) => [id, this.freshState()])));
+  readonly agentFilter = signal<string>('all');
   readonly sessionFilter = signal('all');
   readonly typeFilter = signal('all');
   readonly textFilter = signal('');
   readonly paused = signal(false);
   readonly selected = signal<AgentEvent | null>(null);
   readonly helpOpen = signal(false);
+  readonly reorderAnnouncement = signal('');
+  readonly selectedAgents = signal<string[]>([]);
+  readonly draggedAgent = signal<string | null>(null);
+  readonly hiddenProfiles = computed(() => this.detectedProfiles().filter((p) => this.preferences().hiddenAgents.includes(p.id)));
+  readonly preferenceError = signal('');
+  private preferenceQueue: Promise<void> = Promise.resolve();
   readonly notificationEnabled = signal(false);
   readonly canLoadMore = signal(true);
   readonly loadingMore = signal(false);
@@ -53,7 +62,8 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly viewportHeight = signal(460);
   readonly now = signal(Date.now());
   readonly mascotDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mascot-demo') === '1';
-  readonly demoStates = signal<Record<'claude' | 'codex', MascotState>>({ claude: 'idle', codex: 'idle' });
+  readonly demoStates = signal<Record<string, MascotState>>(Object.fromEntries(this.agentIds.map((id) => [id, 'idle'])));
+  readonly lastDemoAgent = signal<string>('claude');
   readonly filteredEvents = computed(() => {
     const q = this.textFilter().trim().toLocaleLowerCase();
     return this.events().filter((event) =>
@@ -70,12 +80,9 @@ export class AppComponent implements OnInit, OnDestroy {
     return rows.slice(start, end).map((event, index) => ({ event, offset: (start + index) * ROW_HEIGHT }));
   });
   readonly detailTitle = computed(() => this.selected()?.title || this.selected()?.tool || this.typeLabel(this.selected()?.type || 'note'));
-  readonly vigia = computed(() => vigiaState(this.mascotStateFor('claude'), this.mascotStateFor('codex')));
-  readonly sessionsByAgent = computed(() => ({
-    claude: this.sessions().filter((session) => session.agent === 'claude').sort((a, b) => this.compareSessions(b, a)),
-    codex: this.sessions().filter((session) => session.agent === 'codex').sort((a, b) => this.compareSessions(b, a)),
-  }));
-
+  readonly michi = computed(() => this.michiState());
+  readonly michiIndicators = computed(() => this.visibleProfiles().map((profile) => ({ id: profile.id, color: profile.color, state: this.mascotStateFor(profile.id) })));
+  readonly sessionsByAgent = computed(() => Object.fromEntries(this.agentIds.map((id) => [id, this.sessions().filter((session) => session.agent === id).sort((a, b) => this.compareSessions(b, a))])) as Record<string, AgentSession[]>);
   private readonly viewport = viewChild<ElementRef<HTMLElement>>('eventViewport');
   private readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
   private readonly detailPanel = viewChild<ElementRef<HTMLElement>>('detailPanel');
@@ -87,29 +94,25 @@ export class AppComponent implements OnInit, OnDestroy {
   private previousFocus: HTMLElement | null = null;
   private apiState: { agents?: Array<{ agent: string; events: number; tools: number }> } = {};
   private arrivalSequence = 0;
-  private readonly latestAgentEvents = new Map<'claude' | 'codex', { event: AgentEvent; arrival: number }>();
+  private readonly latestAgentEvents = new Map<string, { event: AgentEvent; arrival: number }>();
   private readonly latestSessionEvents = new Map<string, { event: AgentEvent; arrival: number }>();
-
   constructor(private readonly svc: EventsService, readonly mascotState: MascotStateService, readonly mascotEngine: MascotEngine) {}
-
   ngOnInit(): void {
     this.sub = this.svc.stream().subscribe((event) => this.receive(event));
     this.modeSub = this.svc.modeStream().subscribe((mode) => this.mode.set(mode));
     this.handoffSub = this.mascotState.handoffs.subscribe((handoff) => this.animateHandoff(handoff));
-    this.loadInitial();
+    this.loadInitial(); this.loadPreferences();
     this.timers.push(setInterval(() => this.now.set(Date.now()), 1000));
     this.timers.push(setInterval(() => this.refreshSessions(), 15000));
     this.readNotificationPreference();
     window.addEventListener('keydown', this.onKeyDown);
   }
-
   ngOnDestroy(): void {
     this.svc.destroy();
     this.sub?.unsubscribe(); this.modeSub?.unsubscribe(); this.handoffSub?.unsubscribe();
     this.timers.forEach(clearInterval);
     window.removeEventListener('keydown', this.onKeyDown);
   }
-
   private async loadInitial(): Promise<void> {
     const [events, sessions, state] = await Promise.all([
       this.svc.fetchEvents({ limit: 200 }), this.fetchJson<AgentSession[]>('/api/sessions'), this.fetchJson<typeof this.apiState>('/api/state'),
@@ -131,12 +134,10 @@ export class AppComponent implements OnInit, OnDestroy {
     if (sessions) this.mergeSessions(sessions);
     if (state) { this.apiState = state; this.mergeApiState(); }
   }
-
   private async fetchJson<T>(url: string): Promise<T | null> {
     try { const response = await fetch(url); return response.ok ? await response.json() as T : null; }
     catch { return null; }
   }
-
   private receive(raw: AgentEvent): void {
     const event = this.normalize(raw);
     const arrival = ++this.arrivalSequence;
@@ -151,18 +152,15 @@ export class AppComponent implements OnInit, OnDestroy {
     this.updateSession(event, arrival);
     this.notify(event);
   }
-
   private normalize(event: AgentEvent): AgentEvent {
     const meta = event.meta || {};
-    const title = String(event.title || event.tool || '').trim();
+    const rawTitle = String(event.title || event.tool || '').trim();
+    const title = event.agent === 'antigravity' && event.type === 'turn_end' && rawTitle === 'NO_TOOL_CALL' ? 'Turno finalizado' : rawTitle;
     const cwd = meta['cwd'] ? ` · ${this.shortCwd(String(meta['cwd']))}` : '';
     return { ...event, ts: event.ts || new Date().toISOString(), title: title || `${this.typeLabel(event.type)}${cwd}`, detail: String(event.detail || ''), meta };
   }
-
   private eventKey(event: AgentEvent): string { return event.uid || String(event.id ?? `${event.agent}:${event.ts}:${event.type}:${event.title}`); }
-
   eventKeyForTemplate(event: AgentEvent): string { return this.eventKey(event); }
-
   private trackLatest(event: AgentEvent, arrival: number): void {
     const agentEvent = this.latestAgentEvents.get(event.agent);
     if (!agentEvent || compareEventRecency(event, agentEvent.event, arrival, agentEvent.arrival) > 0) this.latestAgentEvents.set(event.agent, { event, arrival });
@@ -170,7 +168,6 @@ export class AppComponent implements OnInit, OnDestroy {
     const sessionEvent = this.latestSessionEvents.get(event.session_id);
     if (!sessionEvent || compareEventRecency(event, sessionEvent.event, arrival, sessionEvent.arrival) > 0) this.latestSessionEvents.set(event.session_id, { event, arrival });
   }
-
   private updateAgentState(event: AgentEvent, arrival: number): void {
     const latest = this.latestAgentEvents.get(event.agent);
     const isLatest = !!latest && latest.event === event && latest.arrival === arrival;
@@ -184,28 +181,22 @@ export class AppComponent implements OnInit, OnDestroy {
       } };
     });
   }
-
   private rebuildStates(events: AgentEvent[]): void {
-    const next = { claude: this.freshState(), codex: this.freshState() };
+    const next: Record<string, AgentState> = Object.fromEntries(this.agentIds.map((id) => [id, this.freshState()]));
     for (const event of events) {
       const prior = next[event.agent];
       next[event.agent] = { ...prior, tools: prior.tools + Number(event.type === 'tool_use' || event.type === 'tool_result'), events: prior.events + 1 };
     }
-    for (const agent of ['claude', 'codex'] as const) {
+    for (const agent of this.agentIds) {
       const latest = this.latestAgentEvents.get(agent)?.event;
       if (latest) next[agent] = { ...next[agent], title: latest.title, detail: latest.detail || '', lastTs: latest.ts, lastModel: String(latest.meta?.['model'] || '') };
     }
     this.states.set(next);
   }
-
   private mergeApiState(): void {
     const totalFor = (agent: string) => this.apiState.agents?.find((item) => item.agent === agent);
-    this.states.update((current) => ({
-      claude: { ...current.claude, events: Math.max(current.claude.events, totalFor('claude')?.events || 0), tools: Math.max(current.claude.tools, totalFor('claude')?.tools || 0) },
-      codex: { ...current.codex, events: Math.max(current.codex.events, totalFor('codex')?.events || 0), tools: Math.max(current.codex.tools, totalFor('codex')?.tools || 0) },
-    }));
+    this.states.update((current) => Object.fromEntries(this.agentIds.map((id) => [id, { ...current[id], events: Math.max(current[id]?.events || 0, totalFor(id)?.events || 0), tools: Math.max(current[id]?.tools || 0, totalFor(id)?.tools || 0) }])));
   }
-
   private updateSession(event: AgentEvent, arrival: number): void {
     if (!event.session_id) return;
     const previous = this.sessions().find((session) => session.id === event.session_id);
@@ -221,11 +212,9 @@ export class AppComponent implements OnInit, OnDestroy {
     };
     this.sessions.update((items) => [next, ...items.filter((session) => session.id !== next.id)].slice(0, 250));
   }
-
   private compareEvents(left: AgentEvent, right: AgentEvent): number {
     return compareEventRecency(left, right, 0, 0);
   }
-
   private compareSessions(left: AgentSession, right: AgentSession): number {
     const leftEvent = this.latestSessionEvents.get(left.id);
     const rightEvent = this.latestSessionEvents.get(right.id);
@@ -241,12 +230,14 @@ export class AppComponent implements OnInit, OnDestroy {
     const rightArrival = useRightEvent ? rightEvent!.arrival : rightArrivalFallback;
     return compareEventRecency(leftValue, rightValue, leftArrival, rightArrival);
   }
-
   private mergeSessions(serverSessions: AgentSession[]): void {
-    this.sessions.set(serverSessions.slice(0, 250));
+    this.sessions.set(serverSessions.slice(0, 250).map((session) => session.agent === 'antigravity' ? {
+      ...session,
+      last_action: session.last_action === 'NO_TOOL_CALL' ? 'Turno finalizado' : session.last_action,
+      lastAction: session.lastAction === 'NO_TOOL_CALL' ? 'Turno finalizado' : session.lastAction,
+    } : session));
     for (const latest of this.latestSessionEvents.values()) this.updateSession(latest.event, latest.arrival);
   }
-
   async loadMore(): Promise<void> {
     if (this.loadingMore() || !this.canLoadMore() || !this.events().length) return;
     this.loadingMore.set(true);
@@ -261,26 +252,28 @@ export class AppComponent implements OnInit, OnDestroy {
     } else this.canLoadMore.set(false);
     this.loadingMore.set(false);
   }
-
   onScroll(event: Event): void {
     const target = event.target as HTMLElement;
     this.viewportTop.set(target.scrollTop); this.viewportHeight.set(target.clientHeight);
     if (target.scrollTop < 100 && this.canLoadMore()) void this.loadMore();
   }
-
-  onAgentFilter(value: 'all' | 'claude' | 'codex'): void { this.agentFilter.set(value); }
+  onAgentFilter(value: string): void { this.agentFilter.set(value); }
   onSessionFilter(event: Event): void { this.sessionFilter.set((event.target as HTMLSelectElement).value); }
   onTypeFilter(event: Event): void { this.typeFilter.set((event.target as HTMLSelectElement).value); }
   onTextFilter(event: Event): void { this.textFilter.set((event.target as HTMLInputElement).value); }
   selectSession(session: AgentSession): void { this.agentFilter.set(session.agent); this.sessionFilter.set(session.id); this.scrollTimelineTop(); }
   clearSessionFilter(): void { this.sessionFilter.set('all'); }
-  setDemoState(agent: 'claude' | 'codex', event: Event): void { this.demoStates.update((states) => ({ ...states, [agent]: (event.target as HTMLSelectElement).value as MascotState })); }
-  mascotStateFor(agent: 'claude' | 'codex'): MascotState { return this.mascotDemo ? this.demoStates()[agent] : this.mascotState.states()[agent]; }
+  setDemoState(agent: string, event: Event): void {
+    const state = (event.target as HTMLSelectElement).value as MascotState;
+    this.demoStates.update((states) => ({ ...states, [agent]: state }));
+    if (['thinking', 'reading', 'editing', 'running'].includes(state)) this.lastDemoAgent.set(agent);
+  }
+  mascotStateFor(agent: string): MascotState { return this.mascotDemo ? this.demoStates()[agent] : this.mascotState.states()[agent] || 'idle'; }
   statusLabel(state: MascotState): string { const label = MASCOT_STATE_LABELS[state]; return label.charAt(0).toLocaleUpperCase('es-PE') + label.slice(1); }
   typeLabel(type: string): string { return TYPE_LABELS[type] || type; }
-  stateFor(agent: 'claude' | 'codex'): AgentState { return this.states()[agent]; }
-  sessionsFor(agent: 'claude' | 'codex'): AgentSession[] { return this.sessionsByAgent()[agent]; }
-  activeSessions(agent: 'claude' | 'codex'): number { return this.sessionsFor(agent).filter((session) => session.state === 'active').length; }
+  stateFor(agent: string): AgentState { return this.states()[agent] || this.freshState(); }
+  sessionsFor(agent: string): AgentSession[] { return this.sessionsByAgent()[agent] || []; }
+  activeSessions(agent: string): number { return this.sessionsFor(agent).filter((session) => session.state === 'active').length; }
   isSubagent(session: AgentSession): boolean { return !!session.parent_session_id; }
   shortCwd(cwd?: string | null): string { return cwd ? cwd.replace(/[\\/]+$/, '').split(/[\\/]/).filter(Boolean).pop() || cwd : 'Ruta desconocida'; }
   relativeTime(value?: string | null): string {
@@ -298,7 +291,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.paused.update((value) => !value);
   }
   toggleCalm(): void { this.mascotEngine.setCalm(!this.mascotEngine.userPreference); }
-  totalFor(agent: 'claude' | 'codex', kind: 'tools' | 'events'): number { return this.stateFor(agent)[kind]; }
+  totalFor(agent: string, kind: 'tools' | 'events'): number { return this.stateFor(agent)[kind]; }
   openDetail(event: AgentEvent, trigger?: HTMLElement): void {
     this.previousFocus = trigger || document.activeElement as HTMLElement;
     this.selected.set(event);
@@ -315,7 +308,6 @@ export class AppComponent implements OnInit, OnDestroy {
     try { await navigator.clipboard.writeText(command); }
     catch { const area = document.createElement('textarea'); area.value = command; document.body.append(area); area.select(); document.execCommand('copy'); area.remove(); }
   }
-
   toggleHelp(): void {
     if (this.helpOpen()) {
       this.helpOpen.set(false);
@@ -340,7 +332,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private notify(event: AgentEvent): void {
     if (!this.notificationEnabled() || document.visibilityState === 'visible' || !('Notification' in window) || Notification.permission !== 'granted') return;
     if (!['permission_request', 'turn_end'].includes(event.type)) return;
-    try { new Notification(`Overseer · ${event.agent === 'claude' ? 'Claude Code' : 'Codex'} · ${this.typeLabel(event.type)}`, { body: event.title || this.typeLabel(event.type) }); } catch { /* API opcional del navegador */ }
+    try { new Notification(`Overseer · ${this.agentName(event.agent)} · ${this.typeLabel(event.type)}`, { body: event.title || this.typeLabel(event.type) }); } catch { /* API opcional del navegador */ }
   }
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     const target = event.target as HTMLElement | null;
@@ -358,20 +350,110 @@ export class AppComponent implements OnInit, OnDestroy {
     if (event.key === 'Escape') { if (this.selected()) this.closeDetail(); else if (this.helpOpen()) this.toggleHelp(); return; }
     if (typing || event.altKey || event.ctrlKey || event.metaKey) return;
     if (event.key === '/') { event.preventDefault(); this.searchInput()?.nativeElement.focus(); }
-    else if (event.key === '1') this.agentFilter.set('claude');
-    else if (event.key === '2') this.agentFilter.set('codex');
+    else if (/^[1-4]$/.test(event.key)) { const agent = this.visibleProfiles()[Number(event.key) - 1]; if (agent) this.agentFilter.set(agent.id); }
     else if (event.key === '0') this.agentFilter.set('all');
     else if (event.key.toLowerCase() === 'p') this.pause();
     else if (event.key.toLowerCase() === 'c') this.toggleCalm();
     else if (event.key === '?') this.toggleHelp();
   };
   private freshState(): AgentState { return { title: 'Sin actividad todavía', detail: '', tools: 0, events: 0, lastTs: null, lastModel: null }; }
+  agentName(id: string): string { return this.profiles().find((profile) => profile.id === id)?.name || id; }
+  michiState(): MascotState {
+    const values = this.visibleProfiles().map((profile) => this.mascotStateFor(profile.id));
+    if (!values.length || values.every((state) => state === 'sleeping')) return 'sleeping';
+    if (values.includes('error')) return 'error'; if (values.includes('permission')) return 'permission';
+    if (values.some((state) => ['thinking', 'reading', 'editing', 'running'].includes(state))) return 'thinking';
+    return values.includes('done') ? 'done' : 'idle';
+  }
+  private async loadPreferences(): Promise<void> {
+    const stored = this.fetchJson<ViewPreferences>('/api/preferences');
+    const agents = this.fetchJson<Array<{ id?: string; agent?: string; name?: string; mascot?: string; color?: string; detected?: boolean; detected_by?: string; sources?: string[] }>>('/api/agents');
+    const [preferences, detected] = await Promise.all([stored, agents]);
+    if (detected) this.profiles.set(detected.map((item) => {
+      const id = item.id || item.agent || ''; const fallback = AGENT_PROFILES.find((profile) => profile.id === id)!;
+      return { ...fallback, ...item, id } as AgentMeta;
+    }).filter((item) => this.agentIds.includes(item.id)));
+    if (preferences && Array.isArray(preferences.agentOrder) && Array.isArray(preferences.hiddenAgents)) this.preferences.set({ ...preferences, agentOrder: [...new Set(preferences.agentOrder.filter((id) => this.agentIds.includes(id)))].concat(this.agentIds.filter((id) => !preferences.agentOrder.includes(id))) });
+    else try { const cached = JSON.parse(localStorage.getItem('agent-ops-view') || 'null'); if (cached?.hiddenAgents) this.preferences.set({ ...this.preferences(), ...cached }); } catch { /* preferencias locales opcionales */ }
+  }
+  async savePreferences(): Promise<void> {
+    const value = this.preferences(); try { localStorage.setItem('agent-ops-view', JSON.stringify(value)); } catch { /* almacenamiento opcional */ }
+    this.preferenceQueue = this.preferenceQueue.then(async () => {
+      try {
+        const response = await fetch('/api/preferences', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value) });
+        if (!response.ok) throw new Error('save');
+        this.preferenceError.set('');
+      } catch { this.preferenceError.set('La vista se conserva en este navegador. No se pudo guardar en el servidor.'); }
+    });
+    await this.preferenceQueue;
+  }
+  async moveAgent(id: string, direction: -1 | 1): Promise<void> {
+    const visible: string[] = this.visibleProfiles().map((p) => p.id); const index = visible.indexOf(id); const next = index + direction;
+    if (index < 0 || next < 0 || next >= visible.length) return;
+    const order = [...this.preferences().agentOrder]; const a = order.indexOf(id); const b = order.indexOf(visible[next]); [order[a], order[b]] = [order[b], order[a]];
+    this.preferences.update((value) => ({ ...value, agentOrder: order }));
+    this.reorderAnnouncement.set(`${this.agentName(id)} movido a la posición ${next + 1} de ${visible.length}.`);
+    await this.savePreferences();
+  }
+  async toggleAgent(id: string): Promise<void> {
+    if (this.preferences().hiddenAgents.includes(id)) await this.restoreAgents([id]);
+    else await this.hideAgents([id]);
+  }
+  selectAgent(id: string): void {
+    this.selectedAgents.update((ids) => ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]);
+  }
+  async hideAgents(ids: string[]): Promise<void> {
+    const selected = ids.filter((id) => this.visibleProfiles().some((p) => p.id === id));
+    if (!selected.length) return;
+    this.preferences.update((value) => ({ ...value, hiddenAgents: [...new Set([...value.hiddenAgents, ...selected])], layout: selected.includes(value.focusAgent) && value.layout === 'focus' ? 'automatic' : value.layout }));
+    this.selectedAgents.update((value) => value.filter((id) => !selected.includes(id)));
+    this.reorderAnnouncement.set(`${selected.length} agentes ocultos.`);
+    if (selected.includes(this.agentFilter())) this.agentFilter.set('all');
+    await this.savePreferences();
+    document.querySelector<HTMLButtonElement>('.restore-agent')?.focus();
+  }
+  async restoreAgents(ids = this.preferences().hiddenAgents): Promise<void> {
+    this.preferences.update((value) => ({ ...value, hiddenAgents: value.hiddenAgents.filter((id) => !ids.includes(id)), layout: 'automatic' }));
+    await this.savePreferences();
+  }
+  async cabinAction(id: string, action: string, event?: Event): Promise<void> {
+    const menu = (event?.target as HTMLElement | undefined)?.closest('details');
+    menu?.querySelector<HTMLElement>('summary')?.focus();
+    menu?.removeAttribute('open');
+    if (action === 'hide') return this.hideAgents([id]);
+    if (action === 'up' || action === 'down') return this.moveAgent(id, action === 'up' ? -1 : 1);
+    this.preferences.update((value) => ({ ...value,
+      ...(action === 'focus' ? { layout: 'focus', focusAgent: id } : {}),
+      ...(action === 'automatic' || action === 'row' ? { layout: action } : {}),
+      ...(action === 'density' ? { density: value.density === 'normal' ? 'compact' : 'normal' } : {}),
+    }));
+    this.selectedAgents.set([]);
+    await this.savePreferences();
+  }
+  startDrag(id: string, event: DragEvent): void {
+    this.draggedAgent.set(id); event.dataTransfer?.setData('text/plain', id);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+  }
+  async dropAgent(target: string, event: DragEvent): Promise<void> {
+    event.preventDefault(); const source = this.draggedAgent(); this.draggedAgent.set(null);
+    if (!source || source === target || !this.visibleProfiles().some((p) => p.id === source)) return;
+    const visible: string[] = this.visibleProfiles().map((p) => p.id); visible.splice(visible.indexOf(source), 1); visible.splice(visible.indexOf(target), 0, source);
+    let i = 0; const order = this.preferences().agentOrder.map((id) => visible.includes(id) ? visible[i++] : id);
+    this.preferences.update((value) => ({ ...value, agentOrder: order }));
+    this.reorderAnnouncement.set(`${this.agentName(source)} movido a la posición ${visible.indexOf(source) + 1}.`);
+    await this.savePreferences();
+  }
+  async updateView(key: 'layout' | 'density', event: Event): Promise<void> {
+    this.preferences.update((value) => ({ ...value, [key]: (event.target as HTMLSelectElement).value })); await this.savePreferences();
+  }
+  async updateFocus(event: Event): Promise<void> { this.preferences.update((value) => ({ ...value, focusAgent: (event.target as HTMLSelectElement).value })); await this.savePreferences(); }
   private refreshSessions(): void { this.fetchJson<AgentSession[]>('/api/sessions').then((sessions) => { if (sessions) this.mergeSessions(sessions); }); }
   private scrollTimelineTop(): void { this.viewport()?.nativeElement.scrollTo({ top: 0 }); this.viewportTop.set(0); }
   private animateHandoff(handoff: MascotHandoff): void {
     if (this.mascotEngine.calm()) return;
-    const from = document.querySelector<SVGSVGElement>(handoff.from === 'claude' ? 'ao-chispa svg' : 'ao-nodo svg');
-    const to = document.querySelector<SVGSVGElement>(handoff.to === 'claude' ? 'ao-chispa svg' : 'ao-nodo svg');
+    const selector = (id: string) => `ao-${this.profiles().find((profile) => profile.id === id)?.mascot || ''} svg`;
+    const from = document.querySelector<SVGSVGElement>(selector(handoff.from));
+    const to = document.querySelector<SVGSVGElement>(selector(handoff.to));
     const envelope = document.querySelector<SVGSVGElement>('#mascot-envelope'); if (!from || !to || !envelope) return;
     const a = from.getBoundingClientRect(); const b = to.getBoundingClientRect(); const sx = a.left + a.width / 2; const sy = a.top + a.height / 2; const dx = b.left + b.width / 2 - sx; const dy = b.top + b.height / 2 - sy;
     envelope.style.left = `${sx - 12}px`; envelope.style.top = `${sy - 9}px`; envelope.style.opacity = '1';

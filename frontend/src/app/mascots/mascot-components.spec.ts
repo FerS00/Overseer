@@ -1,11 +1,11 @@
 import '@angular/compiler';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ChispaComponent, NodoComponent } from './mascot-components';
+import { AstroComponent, ChispaComponent, HondoComponent, MichiComponent, NodoComponent } from './mascot-components';
 import { MascotEngine } from './mascot-engine.service';
 
 describe('mascot drawings', () => {
   beforeEach(() => {
-    TestBed.configureTestingModule({ imports: [ChispaComponent, NodoComponent] });
+    TestBed.configureTestingModule({ imports: [ChispaComponent, NodoComponent, AstroComponent, HondoComponent, MichiComponent] });
     TestBed.inject(MascotEngine).setCalm(true);
   });
 
@@ -44,8 +44,40 @@ describe('mascot drawings', () => {
     expect(new Set(ids).size).toBe(2);
     expect(svgs[0].getAttribute('data-state')).toBe('idle');
     expect(svgs[0].getAttribute('aria-label')).toBe('Nodo: en espera');
-    expect(svgs[0].querySelector('g[fill^="url(#"]')?.getAttribute('fill')).toBe(`url(#${ids[0]})`);
+    expect(svgs[0].querySelector('polygon')?.getAttribute('fill')).toBe(`url(#${ids[0]})`);
     first.destroy(); second.destroy();
+  });
+
+  it('keeps gradients unique across every flat mascot and multiple instances', () => {
+    const fixtures = [NodoComponent, AstroComponent, HondoComponent].flatMap((component) => [TestBed.createComponent(component), TestBed.createComponent(component)]);
+    fixtures.forEach((fixture) => fixture.detectChanges());
+    const ids = fixtures.map((fixture) => fixture.nativeElement.querySelector('linearGradient').id);
+    expect(new Set(ids).size).toBe(6);
+    fixtures.forEach((fixture) => fixture.destroy());
+  });
+
+  it('matches Michi moods and orders collar lights by visible agent and state', () => {
+    const fixture = TestBed.createComponent(MichiComponent);
+    fixture.componentRef.setInput('state', 'permission');
+    fixture.componentRef.setInput('indicators', [
+      { id: 'deepseek', color: '#5CC8F5', state: 'running' },
+      { id: 'claude', color: '#E5774A', state: 'permission' },
+      { id: 'codex', color: '#8FA2FF', state: 'error' },
+      { id: 'antigravity', color: '#F28BC8', state: 'idle' },
+    ]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('svg').getAttribute('data-mood')).toBe('alert');
+    const leds = [...fixture.nativeElement.querySelectorAll('[data-led]')] as SVGElement[];
+    expect(leds.map((led) => led.getAttribute('data-led'))).toEqual(['deepseek', 'claude', 'codex', 'antigravity']);
+    expect(leds.map((led) => led.getAttribute('fill'))).toEqual(['#5CC8F5', '#FBBF24', '#F87171', '#3A4256']);
+    for (const [state, mood] of [['error', 'alarm'], ['done', 'happy'], ['sleeping', 'sleeping'], ['running', 'watching']]) {
+      fixture.componentRef.setInput('state', state); fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('svg').getAttribute('data-mood')).toBe(mood);
+    }
+    fixture.componentRef.setInput('indicators', []); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('svg').getAttribute('data-mood')).toBe('alone');
+    expect(fixture.nativeElement.querySelectorAll('[data-led]')).toHaveLength(0);
+    fixture.destroy();
   });
 
   it('does not react to clicks in calm mode', () => {

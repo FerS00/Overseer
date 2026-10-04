@@ -7,11 +7,18 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const slash = (value) => value.replace(/\\/g, '/');
 export const hookCommand = (agent, root = here) => `node "${slash(path.join(root, 'hook.mjs'))}" ${agent}`;
+export function antigravityHookCommand(agent, root = here) {
+  const script = slash(path.join(root, 'hook.mjs'));
+  if (/\s/.test(script)) throw new Error('Antigravity CLI no separa de forma segura una ruta de hook con espacios; mueve el repositorio a una ruta sin espacios.');
+  return `node ${script} ${agent}`;
+}
 const command = { claude: hookCommand('claude'), codex: hookCommand('codex') };
 const toml = (value) => JSON.stringify(value);
 const targets = {
   claude: path.join(os.homedir(), '.claude', 'settings.json'),
   codex: path.join(os.homedir(), '.codex', 'config.toml'),
+  antigravity: path.join(os.homedir(), '.gemini', 'config', 'hooks.json'),
+  deepseek: path.join(os.homedir(), '.dsh', 'profiles', 'desktop', 'cordis.patch.yml'),
 };
 const events = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionEnd', 'Notification', 'PermissionRequest', 'PostToolUseFailure', 'SubagentStart', 'SubagentStop'];
 const legacyHook = /(?:^|[\\/])integrations[\\/](?:claude-hook|codex-hook|generic-hook|hook)\.mjs(?:["']?)(?:\s|$)/i;
@@ -39,6 +46,52 @@ export function codexAddition() {
     const matcher = ['PreToolUse', 'PostToolUse'].includes(name) ? 'matcher = ""\n' : '';
     return `[[hooks.${name}]]\n${matcher}[[hooks.${name}.hooks]]\ntype = "command"\ncommand = ${toml(command.codex)}\ncommand_windows = ${toml(command.codex)}\ntimeout = 20${name === 'SessionStart' ? '\nstatusMessage = "Overseer"' : ''}`;
   }).join('\n\n');
+}
+
+export function antigravityAddition(root = here) {
+  const hook = antigravityHookCommand('antigravity', root);
+  // Antigravity's stdin payload has no event discriminator.
+  const runner = (event) => ({ type: 'command', command: `${hook} ${event}`, timeout: 10 });
+  return { 'overseer-agent-events': {
+    PreInvocation: [runner('PreInvocation')],
+    PostToolUse: [{ matcher: '.*', hooks: [runner('PostToolUse')] }],
+    PostInvocation: [runner('PostInvocation')],
+    Stop: [runner('Stop')],
+  } };
+}
+
+export function mergeAntigravity(raw, root = here) {
+  const cfg = raw.trim() ? JSON.parse(raw) : {};
+  const addition = antigravityAddition(root)['overseer-agent-events'];
+  const existing = cfg['overseer-agent-events'] || {};
+  for (const [event, rows] of Object.entries(addition)) {
+    if (event === 'PostToolUse') {
+      const retained = (existing[event] || []).filter((row) => !JSON.stringify(row).includes('hook.mjs'));
+      existing[event] = [...retained, ...rows];
+    } else {
+      const retained = (existing[event] || []).filter((row) => !JSON.stringify(row).includes('hook.mjs'));
+      existing[event] = [...retained, ...rows];
+    }
+  }
+  cfg['overseer-agent-events'] = existing;
+  return JSON.stringify(cfg, null, 2) + '\n';
+}
+
+export function mergeDeepSeek(raw, root = here) {
+  if (!/^-\s+id:\s*dsh-hooks\s*$/m.test(raw)) throw new Error('dsh-hooks no aparece en el perfil DeepSeek Harness. Instala el plugin en el perfil desktop antes de aplicar.');
+  const hook = hookCommand('deepseek', root).replaceAll("'", "''");
+  const events = ['turn/start', 'tool/call', 'tool/result', 'approval/asked', 'turn/end', 'agent/status', 'agent/error'];
+  const rows = events.map((event) => `      - on: '${event}'\n        input: 'stdin'\n        run: '${hook}'\n        timeoutMs: 1000\n        maxConcurrent: 4\n        debounceMs: 100`).join('\n');
+  const blockStart = raw.search(/^-\s+id:\s*dsh-hooks\s*$/m);
+  const nextBlock = raw.slice(blockStart + 1).search(/^-\s+id:\s*/m);
+  const blockEnd = nextBlock >= 0 ? blockStart + 1 + nextBlock : raw.length;
+  let block = raw.slice(blockStart, blockEnd);
+  const hooksStart = block.search(/^\s{4}hooks:\s*$/m);
+  if (hooksStart < 0) {
+    if (!/^\s{2}config:\s*$/m.test(block)) throw new Error('El bloque dsh-hooks no contiene config.');
+    block = `${block.trimEnd()}\n    hooks:\n${rows}\n`;
+  } else block = `${block.slice(0, hooksStart)}    hooks:\n${rows}\n`;
+  return raw.slice(0, blockStart) + block + raw.slice(blockEnd);
 }
 
 function dedupeHooks(hooks) {
@@ -227,11 +280,15 @@ function apply(target, text) {
 }
 
 function parseArgs(args) {
-  const result = { applying: false, claude: targets.claude, codex: targets.codex };
+  const result = { applying: false, claude: targets.claude, codex: targets.codex,
+    antigravity: targets.antigravity, deepseek: targets.deepseek, agents: ['claude', 'codex'] };
   for (let index = 0; index < args.length; index++) {
     if (args[index] === '--apply') result.applying = true;
     else if (args[index] === '--claude-settings' && args[index + 1]) result.claude = path.resolve(args[++index]);
     else if (args[index] === '--codex-config' && args[index + 1]) result.codex = path.resolve(args[++index]);
+    else if (args[index] === '--agents' && args[index + 1]) result.agents = args[++index].split(',').map((value) => value.trim()).filter(Boolean);
+    else if (args[index] === '--antigravity-hooks' && args[index + 1]) result.antigravity = path.resolve(args[++index]);
+    else if (args[index] === '--deepseek-profile' && args[index + 1]) result.deepseek = path.resolve(args[++index]);
     else if (args[index] === '--help' || args[index] === '-h') result.help = true;
     else if (args[index] === '--dry-run') result.applying = false;
     else throw new Error(`Argumento desconocido o incompleto: ${args[index]}`);
@@ -241,21 +298,25 @@ function parseArgs(args) {
 
 export function runWireUp(args = process.argv.slice(2)) {
   const options = parseArgs(args);
-  if (options.help) { console.log('Overseer setup: node integrations/wire-up.mjs [--dry-run|--apply] [--claude-settings <ruta>] [--codex-config <ruta>]'); return; }
-  const claudeOld = fs.existsSync(options.claude) ? fs.readFileSync(options.claude, 'utf8') : '{}\n';
-  const codexOld = fs.existsSync(options.codex) ? fs.readFileSync(options.codex, 'utf8') : '';
-  const claudeNew = mergeClaude(claudeOld);
-  const codexNew = mergeCodex(codexOld);
-  // Validate every proposed result before either destination is written.
-  JSON.parse(claudeNew);
-  if (countForeignHookBlocks(codexOld) !== countForeignHookBlocks(codexNew)) throw new Error('La migración alteraría el número de bloques de hooks ajenos.');
-  showDiff(options.claude, claudeOld, claudeNew);
-  showDiff(options.codex, codexOld, codexNew);
-  if (options.applying) {
-    apply(options.claude, claudeNew);
-    apply(options.codex, codexNew);
-    console.log('Codex: vuelve a confiar en los hooks modificados desde /hooks.');
-  } else console.log('Overseer dry-run: no se escribieron archivos. Usa --apply para guardar los cambios.');
+  if (options.help) { console.log('Overseer setup: node integrations/wire-up.mjs [--dry-run|--apply] [--agents claude,codex,antigravity,deepseek] [--claude-settings <ruta>] [--codex-config <ruta>] [--antigravity-hooks <ruta>] [--deepseek-profile <ruta>]'); return; }
+  const config = {
+    claude: [options.claude, (raw) => mergeClaude(raw)],
+    codex: [options.codex, (raw) => mergeCodex(raw)],
+    antigravity: [options.antigravity, (raw) => mergeAntigravity(raw)],
+    deepseek: [options.deepseek, (raw) => mergeDeepSeek(raw)],
+  };
+  for (const id of options.agents) {
+    if (!config[id]) throw new Error(`Agente no reconocido: ${id}`);
+    const [target, merge] = config[id];
+    const oldText = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : (id === 'claude' || id === 'antigravity' ? '{}\n' : '');
+    const newText = merge(oldText);
+    if (id === 'claude' || id === 'antigravity') JSON.parse(newText);
+    if (id === 'codex' && countForeignHookBlocks(oldText) !== countForeignHookBlocks(newText)) throw new Error('La migración alteraría el número de bloques de hooks ajenos.');
+    showDiff(target, oldText, newText);
+    if (options.applying) apply(target, newText);
+  }
+  if (options.applying) console.log('Configuración de hooks actualizada para: ' + options.agents.join(', '));
+  else console.log('Overseer dry-run: no se escribieron archivos. Usa --apply para guardar los cambios.');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) runWireUp();

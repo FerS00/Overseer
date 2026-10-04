@@ -1,36 +1,38 @@
 import { isPlatformBrowser } from '@angular/common';
 import { Inject, Injectable, OnDestroy, PLATFORM_ID, signal } from '@angular/core';
 import { Subject } from 'rxjs';
+import { AGENT_PROFILES } from '../agent-profiles';
 import { AgentEvent } from '../models';
 import { classify, compareEventRecency, MascotRateLimiter, MascotState, transitionState } from './mascot-state';
 
-type AgentId = 'claude' | 'codex';
+type AgentId = AgentEvent['agent'];
 interface SessionMascotState { agent: AgentId; session: string; event: AgentEvent; arrival: number; state: MascotState; stateAt: number; lastActivity: number; }
 export interface MascotHandoff { from: AgentId; to: AgentId; }
+const AGENT_IDS = AGENT_PROFILES.map((profile) => profile.id);
+const FRIENDLY_NAMES: Record<string, string> = Object.fromEntries(AGENT_PROFILES.map((profile) => [profile.id, profile.name]));
 
 @Injectable({ providedIn: 'root' })
 export class MascotStateService implements OnDestroy {
-  readonly states = signal<Record<AgentId, MascotState>>({ claude: 'idle', codex: 'idle' });
+  readonly states = signal<Record<string, MascotState>>(Object.fromEntries(AGENT_IDS.map((id) => [id, 'idle'])));
   readonly announcement = signal('');
+  readonly lastActiveAgent = signal<AgentId | null>(null);
   readonly handoffs = new Subject<MascotHandoff>();
-
   private readonly sessions = new Map<string, SessionMascotState>();
   private readonly lastEvent = new Map<AgentId, { event: AgentEvent; arrival: number }>();
   private readonly announced = new Map<string, number>();
-  private readonly publishLimiter = new MascotRateLimiter<Record<AgentId, MascotState>>((value) => this.states.set(value));
+  private readonly publishLimiter = new MascotRateLimiter<Record<string, MascotState>>((value) => this.states.set(value));
   private readonly limiterTimer?: ReturnType<typeof setInterval>;
   private pendingFlush?: ReturnType<typeof setTimeout>;
   private arrival = 0;
 
   constructor(@Inject(PLATFORM_ID) platformId: object) {
     if (isPlatformBrowser(platformId)) this.limiterTimer = setInterval(() => {
-      const now = Date.now();
-      this.publishLimiter.flush(now);
-      this.refresh(now);
+      const now = Date.now(); this.publishLimiter.flush(now); this.refresh(now);
     }, 250);
   }
 
   consume(event: AgentEvent): void {
+    if (!AGENT_IDS.includes(event.agent)) return;
     const now = Number.isFinite(Date.parse(event.ts)) ? Date.parse(event.ts) : Date.now();
     const arrival = ++this.arrival;
     const agent = event.agent;
@@ -38,24 +40,29 @@ export class MascotStateService implements OnDestroy {
     const sessionKey = `${agent}:${session}`;
     const previousSession = this.sessions.get(sessionKey);
     if (previousSession && compareEventRecency(event, previousSession.event, arrival, previousSession.arrival) <= 0) return;
-    const other: AgentId = agent === 'claude' ? 'codex' : 'claude';
-    const previousOther = this.lastEvent.get(other);
     const previousAgent = this.lastEvent.get(agent);
     const isLatestForAgent = !previousAgent || compareEventRecency(event, previousAgent.event, arrival, previousAgent.arrival) > 0;
-    const isHandoff = isLatestForAgent && (event.type === 'handoff' || event.type === 'user_prompt'
-      && previousOther?.event.type === 'turn_end'
-      && now - Date.parse(previousOther.event.ts) >= 0 && now - Date.parse(previousOther.event.ts) < 10_000);
+    const previousHandoff = [...this.lastEvent.entries()]
+      .filter(([id, value]) => id !== agent && value.event.type === 'turn_end' && now - Date.parse(value.event.ts) >= 0 && now - Date.parse(value.event.ts) < 10_000)
+      .sort((a, b) => compareEventRecency(b[1].event, a[1].event, b[1].arrival, a[1].arrival))[0];
+    const implicitHandoff = event.type === 'user_prompt' && previousHandoff;
+    const explicitHandoff = event.type === 'handoff';
 
-    if (isHandoff) {
-      const recipient = event.type === 'handoff' ? handoffRecipient(event, other) : agent;
-      const sender: AgentId = event.type === 'handoff' ? agent : other;
-      this.handoffs.next({ from: sender, to: recipient });
-      const senderEvent = event.type === 'handoff' ? event : previousOther!.event;
-      this.setSession(sender, senderEvent.session_id || `${sender}:default`, senderEvent, sender === agent ? arrival : previousOther!.arrival, 'idle', now, true);
+    if (isLatestForAgent && (explicitHandoff || implicitHandoff)) {
+      const sender = explicitHandoff ? agent : previousHandoff![0];
+      const recipient = explicitHandoff ? handoffRecipient(event, agent) : agent;
+      if (recipient !== sender) {
+        this.handoffs.next({ from: sender, to: recipient });
+        const senderEvent = explicitHandoff ? event : previousHandoff![1].event;
+        const senderArrival = explicitHandoff ? arrival : previousHandoff![1].arrival;
+        this.setSession(sender, senderEvent.session_id || `${sender}:default`, senderEvent, senderArrival, 'idle', now, true);
+      }
       this.setSession(recipient, session, event, arrival, 'thinking', now);
+      this.lastActiveAgent.set(recipient);
     } else {
       const state = classify(event, now);
       this.setSession(agent, session, event, arrival, state, now);
+      if (['thinking', 'reading', 'editing', 'running', 'permission', 'error', 'done'].includes(state)) this.lastActiveAgent.set(agent);
       this.announce(agent, state, Date.now());
     }
     if (!previousAgent || compareEventRecency(event, previousAgent.event, arrival, previousAgent.arrival) > 0) this.lastEvent.set(agent, { event, arrival });
@@ -69,11 +76,9 @@ export class MascotStateService implements OnDestroy {
   }
 
   private publishSnapshot(): void {
-    const now = Date.now();
-    this.publishLimiter.push(this.snapshot(now), now);
+    const now = Date.now(); this.publishLimiter.push(this.snapshot(now), now);
     if (!this.pendingFlush) this.pendingFlush = setTimeout(() => {
-      this.pendingFlush = undefined;
-      this.publishLimiter.flush(Date.now());
+      this.pendingFlush = undefined; this.publishLimiter.flush(Date.now());
     }, 250);
   }
 
@@ -96,9 +101,9 @@ export class MascotStateService implements OnDestroy {
     if (changed) this.publishSnapshot();
   }
 
-  private snapshot(now: number): Record<AgentId, MascotState> {
-    const result: Record<AgentId, MascotState> = { claude: 'idle', codex: 'idle' };
-    for (const agent of ['claude', 'codex'] as const) {
+  private snapshot(now: number): Record<string, MascotState> {
+    const result: Record<string, MascotState> = Object.fromEntries(AGENT_IDS.map((id) => [id, 'idle']));
+    for (const agent of AGENT_IDS) {
       const latest = [...this.sessions.values()].filter((item) => item.agent === agent)
         .sort((a, b) => compareEventRecency(b.event, a.event, b.arrival, a.arrival))[0];
       if (latest) result[agent] = transitionState(latest.state, latest.lastActivity, now);
@@ -111,16 +116,13 @@ export class MascotStateService implements OnDestroy {
     const key = `${agent}:${state}`;
     if (now - (this.announced.get(key) ?? Number.NEGATIVE_INFINITY) < 5_000) return;
     this.announced.set(key, now);
-    const text = `${agent === 'claude' ? 'Claude Code' : 'Codex'}: ${state === 'permission' ? 'pide permiso' : state === 'done' ? 'terminó' : 'error'}`;
-    this.announcement.set('');
-    queueMicrotask(() => this.announcement.set(text));
+    const text = `${FRIENDLY_NAMES[agent]}: ${state === 'permission' ? 'pide permiso' : state === 'done' ? 'terminó' : 'error'}`;
+    this.announcement.set(''); queueMicrotask(() => this.announcement.set(text));
   }
 }
 
 function handoffRecipient(event: AgentEvent, fallback: AgentId): AgentId {
   const meta = event.meta || {};
   const value = String(meta['to_agent'] || meta['recipient'] || meta['target_agent'] || `${event.title} ${event.detail}`).toLowerCase();
-  if (value.includes('codex')) return 'codex';
-  if (value.includes('claude')) return 'claude';
-  return fallback;
+  return AGENT_IDS.find((id) => value.includes(id) || value.includes(FRIENDLY_NAMES[id].toLowerCase())) || fallback;
 }

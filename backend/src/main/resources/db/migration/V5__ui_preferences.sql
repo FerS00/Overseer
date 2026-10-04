@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS ui_preferences (
+  id VARCHAR(64) NOT NULL PRIMARY KEY,
+  json TEXT NOT NULL,
+  updated_at VARCHAR(64) NOT NULL
+);

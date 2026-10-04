@@ -14,7 +14,7 @@ describe('MascotStateService event recency', () => {
     send({ id: 13, uid: 'codex-late-turn-end', agent: 'codex', session_id: 'codex-current', type: 'turn_end', title: 'Turno antiguo finalizado', ts: new Date(latestAt - 2_000).toISOString() });
 
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(service.states()).toEqual({ claude: 'editing', codex: 'running' });
+    expect(service.states()).toEqual({ claude: 'editing', codex: 'running', antigravity: 'idle', deepseek: 'idle' });
     service.ngOnDestroy();
   });
 });

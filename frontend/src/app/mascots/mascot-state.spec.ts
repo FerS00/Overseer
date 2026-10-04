@@ -1,4 +1,4 @@
-import { classify, compareEventRecency, MascotRateLimiter, transitionState, vigiaState } from './mascot-state';
+import { classify, compareEventRecency, MascotRateLimiter, transitionState, michiState } from './mascot-state';
 
 describe('event recency', () => {
   it('uses timestamp first, id for timestamp ties, then arrival when an id is missing', () => {
@@ -53,12 +53,15 @@ describe('MascotRateLimiter', () => {
   });
 });
 
-describe('Vigía global state', () => {
+describe('Michi global state', () => {
   it.each([
-    ['permission', 'thinking', 'permission'], ['idle', 'error', 'error'], ['reading', 'idle', 'thinking'],
-    ['idle', 'running', 'thinking'], ['done', 'idle', 'done'], ['sleeping', 'sleeping', 'sleeping'],
-    ['sleeping', 'idle', 'idle'],
-  ] as const)('combines %s and %s as %s', (claude, codex, expected) => {
-    expect(vigiaState(claude, codex)).toBe(expected);
+    [{ claude: 'permission', codex: 'thinking', antigravity: 'idle', deepseek: 'sleeping' }, 'permission'],
+    [{ claude: 'idle', codex: 'error', antigravity: 'permission', deepseek: 'sleeping' }, 'error'],
+    [{ claude: 'reading', codex: 'idle', antigravity: 'running', deepseek: 'sleeping' }, 'thinking'],
+    [{ claude: 'done', codex: 'idle', antigravity: 'sleeping', deepseek: 'sleeping' }, 'done'],
+    [{ claude: 'sleeping', codex: 'sleeping', antigravity: 'sleeping', deepseek: 'sleeping' }, 'sleeping'],
+    [{ claude: 'sleeping', codex: 'idle', antigravity: 'sleeping', deepseek: 'sleeping' }, 'idle'],
+  ] as const)('combines all visible agent states', (states, expected) => {
+    expect(michiState(states)).toBe(expected);
   });
 });
