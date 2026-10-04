@@ -36,8 +36,8 @@ export function michiState(states: Record<string, MascotState>): MascotState {
   return 'idle';
 }
 
-const READ_TOOLS = /^(read|grep|glob|ls|rg|cat|type|get-content|websearch|web_search|search|find|sed)$/i;
-const EDIT_TOOLS = /^(edit|write|multiedit|notebookedit|apply_patch)$/i;
+const READ_TOOLS = /^(read|grep|glob|ls|rg|cat|type|get-content|websearch|web_search|search|find|sed|webfetch|web_fetch|view_file|view_code_item|read_file|read_url_content|list_dir|list_files|grep_search|codebase_search|find_by_name|search_web)$/i;
+const EDIT_TOOLS = /^(edit|write|multiedit|notebookedit|apply_patch|replace_file_content|multi_replace_file_content|write_to_file|write_file|edit_file)$/i;
 
 export function classify(event: Partial<AgentEvent>, now = Date.now()): MascotState {
   void now;
