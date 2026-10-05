@@ -22,3 +22,6 @@ frontend/playwright-report/
 frontend/blob-report/
 docs/PLAN_PROYECTO.md
 docs/ESTADO_TRABAJO.md
+desktop/**/bin/
+desktop/**/obj/
+desktop/**/TestResults/

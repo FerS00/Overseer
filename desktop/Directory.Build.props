@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Company>Overseer</Company>
+    <Product>Overseer Desktop</Product>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+</Project>
