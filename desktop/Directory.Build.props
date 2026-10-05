@@ -5,6 +5,8 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Company>Overseer</Company>
     <Product>Overseer Desktop</Product>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
+    <!-- Release symbols live inside the assemblies, so a portable publish is a single .exe. -->
+    <DebugType Condition="'$(Configuration)' == 'Release'">embedded</DebugType>
   </PropertyGroup>
 </Project>
