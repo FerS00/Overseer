@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build & Release Desktop App
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build & Publish Desktop Executable
+        shell: pwsh
+        run: |
+          cd desktop
+          ./publish.ps1 -Runtime win-x64 -Configuration Release
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Overseer ${{ github.ref_name }}
+          draft: false
+          prerelease: true
+          generate_release_notes: true
+          files: desktop/dist/Overseer.Desktop.exe
+          body: |
+            ### Overseer ${{ github.ref_name }} (Preview)
+
+            Monitor local en tiempo real para Claude Code, Codex, Antigravity y DeepSeek Harness.
+
+            #### Novedades
+            - **Barra de escritorio nativa para Windows (`desktop/`):** Aplicación en .NET 8 / WPF, sin marcos, siempre visible en pantalla (`always-on-top`), con flyout interactivo expandible por agente.
+            - **Icono en System Tray y menú de filtros:** Configuración visual para alternar qué mascotas se muestran en la barra superior.
+            - **Límites y scroll en el flyout:** Visualización fluida de tareas, comandos extensos y rutas sin desbordamientos.
+            - **Modo Dock en interfaz web:** Vista compacta estilo dock o cabinas completas en Angular 22.
+            - **Ejecutable portable único:** Descarga directa de `Overseer.Desktop.exe` (autocontenido, no requiere instalar .NET en la máquina destino).
+
+            > **Fase de pruebas:** Este release corresponde a una fase de evaluación y pruebas activas. Si encuentras algún comportamiento inesperado o tienes sugerencias, por favor repórtalo en [GitHub Issues](https://github.com/FerS00/overseer/issues).
