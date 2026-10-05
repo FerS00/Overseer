@@ -4,39 +4,62 @@ using System.Windows.Forms;
 
 namespace Overseer.Desktop;
 
-/// <summary>System tray icon (Michi) with the bar's commands.</summary>
+/// <summary>System tray icon (Michi) with the same commands as the bar's right-click menu.</summary>
 public sealed class TrayIcon : IDisposable
 {
     private readonly NotifyIcon icon;
+    private readonly IBarCommands commands;
+    private readonly ToolStripMenuItem agentsItem = new("Agentes visibles");
     private readonly ToolStripMenuItem barItem = new("Ocultar barra");
     private readonly ToolStripMenuItem topmostItem = new("Siempre visible") { CheckOnClick = true };
     private readonly ToolStripMenuItem calmItem = new("Modo calma") { CheckOnClick = true };
 
-    public Action? ToggleBar { get; init; }
-    public Action<bool>? SetTopmost { get; init; }
-    public Action<bool>? SetCalm { get; init; }
-    public Action? OpenWeb { get; init; }
-    public Action? Exit { get; init; }
-
-    public TrayIcon(bool topmost, bool calm)
+    public TrayIcon(IBarCommands commands)
     {
-        topmostItem.Checked = topmost;
-        calmItem.Checked = calm;
-        barItem.Click += (_, _) => ToggleBar?.Invoke();
-        topmostItem.Click += (_, _) => SetTopmost?.Invoke(topmostItem.Checked);
-        calmItem.Click += (_, _) => SetCalm?.Invoke(calmItem.Checked);
+        this.commands = commands;
+        barItem.Click += (_, _) => commands.ToggleBar();
+        topmostItem.Click += (_, _) => commands.SetTopmost(topmostItem.Checked);
+        calmItem.Click += (_, _) => commands.SetCalm(calmItem.Checked);
+        // Keep the agents submenu open while toggling several agents.
+        agentsItem.DropDown.Closing += (_, e) => { if (e.CloseReason == ToolStripDropDownCloseReason.ItemClicked) e.Cancel = true; };
+
         var menu = new ContextMenuStrip();
+        menu.Items.Add(agentsItem);
+        menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(barItem);
         menu.Items.Add(topmostItem);
         menu.Items.Add(calmItem);
-        menu.Items.Add(new ToolStripMenuItem("Abrir versión web", null, (_, _) => OpenWeb?.Invoke()));
+        menu.Items.Add(new ToolStripMenuItem("Abrir versión web", null, (_, _) => commands.OpenWeb()));
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(new ToolStripMenuItem("Salir", null, (_, _) => Exit?.Invoke()));
+        menu.Items.Add(new ToolStripMenuItem("Salir", null, (_, _) => commands.Quit()));
+        menu.Opening += (_, _) => Refresh();
+
         icon = new NotifyIcon { Icon = LoadIcon(), Text = "Overseer", ContextMenuStrip = menu, Visible = true };
-        icon.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) ToggleBar?.Invoke(); };
+        icon.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) commands.ToggleBar(); };
     }
 
-    public void SetBarVisible(bool visible) => barItem.Text = visible ? "Ocultar barra" : "Mostrar barra";
+    /// <summary>Syncs checks and the agent list with the current state before the menu is shown.</summary>
+    private void Refresh()
+    {
+        barItem.Text = commands.BarVisible ? "Ocultar barra" : "Mostrar barra";
+        barItem.ShortcutKeyDisplayString = commands.HotkeyText ?? "";
+        topmostItem.Checked = commands.Topmost;
+        calmItem.Checked = commands.Calm;
+        agentsItem.DropDownItems.Clear();
+        var choices = commands.AgentChoices;
+        if (choices.Count == 0) agentsItem.DropDownItems.Add(new ToolStripMenuItem("Ningún agente detectado") { Enabled = false });
+        foreach (var choice in choices)
+        {
+            var id = choice.Agent.Id;
+            var item = new ToolStripMenuItem(choice.HiddenInWeb ? $"{choice.Agent.Name} · oculto en la web" : choice.Agent.Name)
+            {
+                Checked = choice.Shown, CheckOnClick = true, Enabled = !choice.HiddenInWeb,
+                ToolTipText = choice.HiddenInWeb ? "Actívalo en Ajustes de vista de la web" : null,
+            };
+            item.CheckedChanged += (_, _) => commands.SetAgentVisible(id, item.Checked);
+            agentsItem.DropDownItems.Add(item);
+        }
+    }
 
     /// <summary>Tray tooltips are limited to 63 characters.</summary>
     public void SetStatus(string status)
