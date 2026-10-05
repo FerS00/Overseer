@@ -67,3 +67,19 @@ Estado de verificación: **Aprobado en local** (2026-10-04), rama `claude/dock-p
 | Angular producción | Build aprobado |
 
 No se ejecutaron Docker, sesiones reales de los agentes, Semgrep ni las pruebas de `integrations/` (sin cambios en esa carpeta). Las pruebas se ejecutaron con Node 24.21 porque Angular CLI rechaza el Node 22.22.0 del entorno.
+
+## Barra de escritorio para Windows (`desktop/`)
+
+Estado de verificación: **compila y pasa las pruebas en Linux; no ejecutada en Windows** (2026-10-05), rama `claude/dock-phases-17-22`.
+
+- Proyecto C#/WPF en .NET 8 con núcleo sin interfaz (`Overseer.Desktop.Core`), aplicación WPF (`Overseer.Desktop`) y pruebas xUnit.
+- Barra sin bordes, transparente y siempre visible arriba en el centro, arrastrable; panel que se despliega hacia abajo al pulsar una mascota; icono de bandeja con mostrar/ocultar, siempre visible, modo calma, abrir la web y salir.
+- Michi como icono de la aplicación, la ventana y la bandeja, generado desde `frontend/src/favicon.svg`.
+- Las cuatro mascotas y sus nueve estados portados desde el prototipo 4c y verificados visualmente con el lienzo SVG.
+
+| Comprobación | Resultado |
+|---|---|
+| `dotnet build` (Linux, `EnableWindowsTargeting`, avisos como errores) | Aprobado |
+| `dotnet test` | 60 aprobadas |
+
+El SDK de Ubuntu no incluye los destinos de WPF; se copiaron de la versión de Microsoft del mismo SDK (8.0.131) para compilar. La ventana, el arrastre, la animación de despliegue y el icono de bandeja quedan pendientes de probar en Windows.
