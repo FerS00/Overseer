@@ -98,6 +98,10 @@ The nine mascot states are idle, thinking, reading, editing, running, permission
 
 For Antigravity, use `node integrations/wire-up.mjs --agents antigravity --apply`; each command supplies its event name because the client's stdin payload has no discriminator. For DeepSeek Harness, use `--agents deepseek --apply` with the existing desktop dsh-hooks profile. See [Configuration](CONFIGURATION.md) for client setup and verification limits.
 
+## Desktop bar
+
+The optional Windows bar lives in `desktop/` (C#, WPF, .NET 8). With the backend running, start it with `dotnet run --project desktop/src/Overseer.Desktop`, or add `-- --demo` to try it with sample data. It reads `/api/agents`, `/api/preferences`, `/api/events` and the `/events` stream, and shows the agents enabled in the dock view. Run its tests with `dotnet test desktop`. Details, tray options and settings: [desktop/README.md](../desktop/README.md).
+
 ## HTTP API
 
 The GET routes and SSE stream are read-only. Ingest is token-protected. `GET /api/preferences` reads the saved view; `PUT /api/preferences` saves its agentOrder, hiddenAgents, layout, density, focusAgent, viewMode (`cabins` or `dock`), dockHiddenAgents, and dockSize (`normal` or `compact`) locally. The three dock fields are optional: missing fields keep their stored value, and invalid values or repeated ids return `400`.

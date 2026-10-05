@@ -64,6 +64,13 @@ The settings dialog chooses dock or cabins, shows or hides each mascot in the do
 
 Reading, editing and running have twelve sub-states (for example running tests, building, installing dependencies, waiting on subagents, batch reading or a single file). Each adds a badge and a small movement around the mascot, and long tasks get occasional variations so they never look frozen. Calm mode and reduced motion turn all of it off.
 
+### Desktop bar (Windows)
+<img src="docs/images/michi-icon.png" alt="Michi icon" width="64" align="right">
+
+`desktop/` contains a native Windows version written in C# and WPF: a borderless, always-on-top bar with only the mascots, a panel that unfolds below the bar when you click one, and Michi in the system tray. It reads the same local backend as the web app and uses the same order and dock visibility. See [desktop/README.md](desktop/README.md).
+
+![Desktop mascots](docs/images/desktop-mascots.png)
+
 ### Cabins and timeline
 ![Timeline event detail](docs/images/timeline-detail-v4c.png)
 

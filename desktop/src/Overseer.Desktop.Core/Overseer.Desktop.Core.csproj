@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- UI-free logic shared by the WPF app and the tests, so it builds and runs on any OS. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Overseer.Desktop.Core</RootNamespace>
+  </PropertyGroup>
+</Project>

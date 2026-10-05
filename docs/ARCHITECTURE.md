@@ -87,6 +87,10 @@ The catalog pairs Claude Code with Chispa, Codex with Nodo, Antigravity with Ast
 
 `DockBarComponent` renders the slots for detected agents that are not hidden in the dock, in `agentOrder`, with roving focus. `AgentFlyoutComponent` is a non-modal dialog positioned under its slot and clamped to the viewport. `ViewSettingsComponent` is a native modal `<dialog>`. `PreferencesService` owns loading, partial updates, serialized PUTs and the browser copy, and starts from that copy so dock mode does not flash the cabins.
 
+### Desktop bar
+
+`desktop/` is a second read-only client. `Overseer.Desktop.Core` (net8.0, no UI) ports the event classifier, sub-states and done/sleep transitions, parses the SSE stream, and draws the four mascots through `IMascotCanvas`: the WPF app implements it over `DrawingContext`, and an SVG implementation lets the tests render every mascot and state on any OS. The WPF app redraws visible mascots from a single `CompositionTarget.Rendering` handler, paused when the bar is hidden and stopped in calm mode. `LiveConnection` seeds the last 200 events, follows `/events` with `Last-Event-ID`, reconnects with backoff and refreshes agents and preferences every 30 seconds.
+
 ### Interaction and preference ordering
 
 Cabin selection is an ephemeral signal. A batch hide performs one hiddenAgents update and one queued PUT, keeping all unselected agents and the event history intact. The native details/summary menu exposes the same reordering operation as dragging, with keyboard/touch buttons. Reordering visible cabins preserves hidden positions. The dock fields (`viewMode`, `dockHiddenAgents`, `dockSize`) are optional in `PUT /api/preferences`; the server merges the request over the stored document before validating it. Loaded agentOrder retains the saved sequence, filters unknown/duplicate ids, and appends missing supported ids. Saves are serialized to prevent a slower older request from overwriting a newer view.
