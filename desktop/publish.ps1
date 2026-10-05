@@ -11,12 +11,13 @@
 param(
   [ValidateSet('win-x64', 'win-arm64', 'win-x86')]
   [string] $Runtime = 'win-x64',
-  [string] $Output = (Join-Path $PSScriptRoot 'dist'),
+  [string] $Output = '',
   [string] $Configuration = 'Release',
   [switch] $SkipTests
 )
 
 $ErrorActionPreference = 'Stop'
+if (-not $Output) { $Output = Join-Path $PSScriptRoot 'dist' }
 Set-Location $PSScriptRoot
 
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
