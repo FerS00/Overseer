@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- NotifyIcon (system tray) comes from Windows Forms. -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <!-- Explicit usings avoid clashes between WPF and Windows Forms types such as Application. -->
+    <ImplicitUsings>disable</ImplicitUsings>
+    <!-- Lets the project build (not run) on Linux and macOS, for example in CI. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ApplicationIcon>Assets\michi.ico</ApplicationIcon>
+    <AssemblyName>Overseer.Desktop</AssemblyName>
+    <RootNamespace>Overseer.Desktop</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- WFAC010 is the Windows Forms DPI analyzer; this is a WPF app, whose DPI awareness belongs in the manifest. -->
+    <NoWarn>$(NoWarn);WFAC010</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets\michi.ico" />
+    <Resource Include="Assets\michi-256.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Overseer.Desktop.Core\Overseer.Desktop.Core.csproj" />
+  </ItemGroup>
+</Project>

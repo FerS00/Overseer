@@ -1,0 +1,134 @@
+<Window x:Class="Overseer.Desktop.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:r="clr-namespace:Overseer.Desktop.Rendering"
+        Title="Overseer" Icon="Assets/michi.ico"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
+        Topmost="True" ShowInTaskbar="False" ShowActivated="False"
+        SizeToContent="Height" Width="388" UseLayoutRounding="True"
+        FontFamily="{StaticResource Body}" Foreground="{StaticResource Fg}"
+        PreviewKeyDown="OnPreviewKeyDown">
+  <Window.Resources>
+    <Style x:Key="SlotButton" TargetType="Button">
+      <Setter Property="Foreground" Value="{StaticResource Fg}" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Bd" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="14" Padding="2,4,2,3" Margin="2,0" RenderTransformOrigin=".5,.5">
+              <ContentPresenter />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Background" Value="{StaticResource Surface2}" /></Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Ring}" /></Trigger>
+              <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Surface2}" />
+                <Setter TargetName="Bd" Property="BorderBrush" Value="{Binding Accent}" />
+                <Setter TargetName="Bd" Property="RenderTransform"><Setter.Value><ScaleTransform ScaleX="1.06" ScaleY="1.06" /></Setter.Value></Setter>
+              </DataTrigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="FlyoutButton" TargetType="Button">
+      <Setter Property="Foreground" Value="{StaticResource Fg}" />
+      <Setter Property="Background" Value="{StaticResource Surface2}" />
+      <Setter Property="BorderBrush" Value="{StaticResource LineStrong}" />
+      <Setter Property="Padding" Value="14,0" />
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Ring}" /></Trigger>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Opacity" Value=".88" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="Caption" TargetType="TextBlock">
+      <Setter Property="FontFamily" Value="{StaticResource Mono}" />
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{StaticResource Muted}" />
+    </Style>
+  </Window.Resources>
+
+  <!-- The margin leaves room for the bar shadow; fully transparent pixels let clicks through to the desktop. -->
+  <StackPanel Margin="12,8,12,16">
+    <Border x:Name="Bar" HorizontalAlignment="Center" CornerRadius="22" Background="#E011151F" BorderBrush="{StaticResource Line}" BorderThickness="1"
+            Padding="8,6" MouseLeftButtonDown="OnBarMouseDown" ToolTip="Arrastra para mover la barra">
+      <Border.Effect><DropShadowEffect BlurRadius="18" ShadowDepth="4" Opacity=".45" Color="Black" /></Border.Effect>
+      <StackPanel Orientation="Horizontal">
+        <ItemsControl x:Name="SlotList" ItemsSource="{Binding Slots}" Focusable="False" KeyboardNavigation.DirectionalNavigation="Cycle">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Button Style="{StaticResource SlotButton}" Click="OnSlotClick" ToolTip="{Binding Name}" AutomationProperties.Name="{Binding AutomationName}">
+                <StackPanel Width="58">
+                  <r:MascotView Kind="{Binding Kind}" State="{Binding State}" Width="44" Height="44" HorizontalAlignment="Center" />
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,2,0,0">
+                    <Ellipse Width="6" Height="6" Fill="{Binding StateBrush}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                    <TextBlock Text="{Binding ShortLabel}" Style="{StaticResource Caption}" FontSize="9" />
+                  </StackPanel>
+                </StackPanel>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Rectangle Width="1" Fill="{StaticResource Line}" Margin="6,8" />
+        <Ellipse Width="8" Height="8" Fill="{Binding StatusBrush}" VerticalAlignment="Center" Margin="4,0,6,0" ToolTip="{Binding StatusText}" />
+      </StackPanel>
+    </Border>
+
+    <!-- Height is animated from 0 so the panel unfolds downwards from the bar. -->
+    <Border x:Name="FlyoutHost" Height="0" ClipToBounds="True" Visibility="Collapsed">
+      <Border x:Name="Flyout" DataContext="{Binding Selected}" Margin="0,10,0,0" Width="340" VerticalAlignment="Top" HorizontalAlignment="Center"
+              CornerRadius="18" Background="{StaticResource Surface}" BorderBrush="{StaticResource LineStrong}" BorderThickness="1" Padding="16">
+        <Border.RenderTransform><TranslateTransform x:Name="FlyoutOffset" /></Border.RenderTransform>
+        <StackPanel>
+          <DockPanel LastChildFill="True">
+            <Border DockPanel.Dock="Right" VerticalAlignment="Top" Background="{StaticResource Surface2}" CornerRadius="12" Padding="10,4">
+              <StackPanel Orientation="Horizontal">
+                <Ellipse Width="8" Height="8" Fill="{Binding StateBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <TextBlock Text="{Binding StateLabel}" FontFamily="{StaticResource Mono}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Muted}" />
+              </StackPanel>
+            </Border>
+            <StackPanel>
+              <TextBlock Text="{Binding Name}" Foreground="{Binding Accent}" FontSize="17" FontWeight="Bold" />
+              <TextBlock FontFamily="{StaticResource Mono}" FontSize="11" Foreground="{StaticResource Muted}">
+                <Run Text="{Binding MascotName, Mode=OneWay}" /><Run Text=" · sesión " /><Run Text="{Binding Session, Mode=OneWay}" />
+              </TextBlock>
+            </StackPanel>
+          </DockPanel>
+
+          <Border Margin="0,12,0,0" Background="{StaticResource Stage}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="12" Padding="12">
+            <StackPanel>
+              <TextBlock Text="{Binding ActivityLabel}" FontSize="14" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding Tool}" FontFamily="{StaticResource Mono}" FontSize="11" Foreground="{StaticResource Muted}" Visibility="{Binding HasTool, Converter={StaticResource Visible}}" />
+              <TextBlock Text="{Binding TargetKind}" Style="{StaticResource Caption}" Margin="0,8,0,2" />
+              <TextBlock Text="{Binding TargetText}" FontFamily="{StaticResource Mono}" FontSize="12" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+
+          <UniformGrid Columns="2" Margin="0,12,0,0">
+            <StackPanel><TextBlock Text="EN ESTE ESTADO" Style="{StaticResource Caption}" /><TextBlock Text="{Binding SinceText}" FontFamily="{StaticResource Mono}" FontSize="13" FontWeight="SemiBold" /></StackPanel>
+            <StackPanel><TextBlock Text="ÚLTIMO EVENTO" Style="{StaticResource Caption}" /><TextBlock Text="{Binding LastText}" FontFamily="{StaticResource Mono}" FontSize="13" FontWeight="SemiBold" /></StackPanel>
+          </UniformGrid>
+
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button Style="{StaticResource FlyoutButton}" Background="{StaticResource Brand}" BorderBrush="{StaticResource Brand}" Foreground="{StaticResource OnBrand}"
+                    FontWeight="SemiBold" Content="Ver en la web" Click="OnOpenWeb" Margin="0,0,8,0" />
+            <Button Style="{StaticResource FlyoutButton}" Content="Cerrar" Click="OnCloseFlyout" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Border>
+  </StackPanel>
+</Window>
