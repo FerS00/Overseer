@@ -19,6 +19,9 @@
 ### Overview
 > Overseer is a local, real-time, read-only monitor for Claude Code, Codex, Antigravity, and DeepSeek Harness. It shows installed agents, their sessions, and a filterable event timeline. Customize directly on each cabin: drag its handle to reorder, select several checkboxes to hide them together, or open its options for focus, layout, density, and keyboard movement. Hidden agents have recovery buttons. The layout rearranges as cabins are hidden or restored: a single cabin stays centered, and three cabins place the last one below the centered pair. A compact **dock view** keeps only the mascots in a bar at the top of the window; each mascot opens a panel with the exact task in progress.
 
+> [!NOTE]
+> **Testing & Preview Phase:** Overseer is currently in an active testing and preview phase. If you use this project and encounter any bugs, unexpected behavior, or have suggestions, please [open an issue on GitHub](https://github.com/FerS00/overseer/issues). Feedback is greatly appreciated!
+
 ---
 
 ### Mascots
@@ -113,8 +116,10 @@ flowchart LR
     CW --> ES
     ES --> DB[(H2 by default · Flyway)]
     ES --> SSE[SSE event stream]
-    UI[Angular dashboard] --> API[Read API]
+    UI[Angular dashboard / Web dock] --> API[Read API]
     UI --> SSE
+    DESK[Windows Desktop Bar .NET 8 WPF] --> API
+    DESK --> SSE
     LC[Trusted local HTTP client] -->|token-authenticated POST| ING[POST /api/ingest]
     ING --> ES
 ```
@@ -127,9 +132,10 @@ flowchart LR
 | **Backend** | `Java 21` · `Spring Boot 3.5` · `Spring MVC` · `Spring Data JPA` |
 | **Storage** | `H2` · `MySQL` (optional) · `Flyway` |
 | **Frontend** | `Angular 22` · `TypeScript 6` · `RxJS` |
+| **Desktop (Windows)** | `.NET 8` · `C#` · `WPF` · `System Tray` · Single-file portable EXE |
 | **Integrations** | `Node.js 24` · Claude Code · Codex hooks and rollout JSONL · Antigravity · DeepSeek Harness |
-| **Verification** | `Maven` · `Vitest` · `Playwright` · `node:test` |
-| **Packaging** | `Docker` · `Docker Compose` |
+| **Verification** | `Maven` · `Vitest` · `Playwright` · `xUnit` · `node:test` |
+| **Packaging** | `Docker` · `Docker Compose` · `publish.ps1` |
 
 ---
 
@@ -193,6 +199,17 @@ npm start
 
 The development UI is at `http://127.0.0.1:4200`; its proxy forwards API and SSE requests to port `8787`.
 
+Start the native Windows desktop bar (optional):
+
+```powershell
+cd desktop
+dotnet run --project src/Overseer.Desktop
+
+# Or build the portable single-file executable:
+powershell -ExecutionPolicy Bypass -File .\publish.ps1
+# Generates desktop\dist\Overseer.Desktop.exe (self-contained, no .NET install required)
+```
+
 The setup detects installed agents and configures their integrations. Antigravity uses `~/.gemini/config/hooks.json`; DeepSeek Harness uses its desktop profile. See [Configuration](docs/CONFIGURATION.md) for supported client paths and verification limits.
 
 Connect the installed agents. Claude Code hooks are added to `~/.claude/settings.json`. Codex setup enables `[features] hooks = true` and adds hook entries to `~/.codex/config.toml`. Review the dry-run diff before applying; `--apply` creates timestamped backups of existing settings files. In Codex, open `/hooks` and trust the changed hooks. If you leave them untrusted, Overseer can still read Codex activity from `~/.codex/sessions` rollouts. Then run the diagnostic:
@@ -211,6 +228,7 @@ Run the project checks from the repository root:
 cd backend; mvn test
 cd ..\frontend; npm test
 npm run e2e
+cd ..\desktop; dotnet test
 cd ..; node --test integrations/
 ```
 
@@ -222,7 +240,7 @@ cd ..; node --test integrations/
 | DeepSeek Harness hooks | Implemented; fixtures tested, real client session not yet verified |
 | Local API, persistence, sessions, and SSE | Implemented; Maven tests included |
 | Angular dashboard and mascot system | Implemented; Vitest and Playwright tests included |
-| Desktop island window | Planned |
+| Native Windows Desktop bar (.NET 8 WPF) | Implemented (testing preview); single-file portable build and 72 xUnit tests included |
 
 ### Troubleshooting
 - **The dashboard shows no events:** check that `.env` points `AGENT_OPS_EVENTS_DIR` and `AGENT_OPS_CODEX_SESSIONS_DIR` to the host folders above, then run `node integrations/doctor.mjs`.

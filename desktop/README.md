@@ -4,6 +4,9 @@
 
 A native Windows bar for Overseer, written in C# with WPF on .NET 8. It sits at the top of the screen, always on top, and shows only the mascots of the agents you work with. Click a mascot to unfold its panel with the current task. The web app keeps working as before; both read the same local backend.
 
+> [!NOTE]
+> **Testing & Preview Phase:** Overseer Desktop is currently in an active testing and experimental preview phase. If you use it and find any issues, styling anomalies, or have suggestions, please [report them via GitHub Issues](https://github.com/FerS00/overseer/issues). Feedback is greatly appreciated!
+
 ![Mascots drawn by the desktop renderer](../docs/images/desktop-mascots.png)
 
 ## Requirements

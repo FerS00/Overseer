@@ -19,8 +19,10 @@ flowchart LR
     D --> DB[(H2 or configured MySQL)]
     D --> SS[SSE broadcast]
     DB --> REST[Read API and replay]
-    REST --> UI[Angular dashboard]
+    REST --> UI[Angular dashboard / Web dock]
     SS --> UI
+    REST --> DESK[Windows Desktop Bar .NET 8 WPF]
+    SS --> DESK
 ```
 
 ### Event sources
