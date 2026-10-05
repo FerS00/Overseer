@@ -12,6 +12,10 @@ public sealed record DesktopSettings
     public double? Top { get; init; }
     public bool Topmost { get; init; } = true;
     public bool Calm { get; init; }
+    /// <summary>Agents unchecked in the "Agentes visibles" menu. Kept per user, independent of the web settings.</summary>
+    public List<string> HiddenAgents { get; init; } = [];
+    /// <summary>Global shortcut that shows or hides the bar, for example "Ctrl+Shift+O". Empty disables it.</summary>
+    public string Hotkey { get; init; } = "Ctrl+Shift+O";
 
     public static string DefaultPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Overseer", "desktop.json");
 

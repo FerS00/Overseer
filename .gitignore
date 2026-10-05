@@ -25,3 +25,4 @@ docs/ESTADO_TRABAJO.md
 desktop/**/bin/
 desktop/**/obj/
 desktop/**/TestResults/
+desktop/dist/
