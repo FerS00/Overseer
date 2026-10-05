@@ -25,11 +25,18 @@ Without a backend, try it with sample data:
 dotnet run --project src/Overseer.Desktop -- --demo
 ```
 
-Publish a single folder you can copy to another machine:
+## Portable executable
+
+`publish.ps1` runs the tests and builds one self-contained `Overseer.Desktop.exe` (about 70 MB, no .NET installation needed) in `desktop/dist`:
 
 ```powershell
-dotnet publish src/Overseer.Desktop -c Release -r win-x64 --self-contained false -o publish
+cd desktop
+./publish.ps1                      # win-x64
+./publish.ps1 -Runtime win-arm64   # Windows on ARM
+./publish.ps1 -Output C:\Tools\Overseer -SkipTests
 ```
+
+The same build without the script: `dotnet publish src/Overseer.Desktop -p:PublishProfile=Portable`. Copy the file anywhere and run it; the first start unpacks native libraries to a temporary folder, so it takes a moment longer.
 
 ## Using the bar
 
@@ -37,17 +44,24 @@ dotnet publish src/Overseer.Desktop -c Release -r win-x64 --self-contained false
 | :--- | :--- |
 | Drag the bar background | Moves the bar. The position is remembered. |
 | Click a mascot, or focus it and press `Enter` | Unfolds the panel below the bar: state, sub-state (for example *Ejecutando pruebas*), tool, exact file/command/URL, time in this state and last event. |
-| Click the same mascot, **Cerrar** or `Esc` | Folds the panel away and returns focus to the mascot. |
+| Click the same mascot, **Cerrar**, `Esc`, or click anywhere outside the bar | Folds the panel away. |
+| **Copiar** in the panel | Copies the current file path, command or URL (or the event detail) to the clipboard. |
+| Right-click the bar | Menu with **Agentes visibles**, **Siempre visible**, **Modo calma**, **Abrir versión web**, **Ocultar barra** and **Salir**. |
+| `Ctrl+Shift+O` (anywhere in Windows) | Shows or hides the bar. Change or turn it off with `hotkey` in the settings. |
 | `←` / `→` | Moves between mascots. |
 | **Ver en la web** | Opens the web app in the browser. |
 
+The panel is at most 520 px wide and 400 px tall (less if the bar is near the bottom of the screen). Long paths and commands wrap, and the task details scroll inside the panel while the header and buttons stay put; **Detalle completo** shows the whole event text.
+
 The dot at the right of the bar shows the connection: green live, amber connecting, red without connection. The bar keeps retrying with a growing delay (up to 30 s) and resumes the stream where it left off.
 
-Which mascots appear and in what order comes from the web app: **Ajustes de vista** → *Agentes y orden* (the dock switches). Agents that are not detected on this computer are not shown. Changes are picked up within 30 seconds.
+### Choosing the mascots
+
+**Agentes visibles** (right-click the bar, or in the tray menu) lists the agents detected on this computer with a check box each. Unchecking one removes its mascot from the bar at once; the choice is saved in `hiddenAgents` and kept across restarts. The order, and any agent switched off in the web app's **Ajustes de vista** (shown as *oculto en la web*), come from the web settings and are picked up within 30 seconds.
 
 ### Tray icon
 
-Michi lives in the notification area. Left click shows or hides the bar. The menu offers **Ocultar/Mostrar barra**, **Siempre visible**, **Modo calma**, **Abrir versión web** and **Salir**.
+Michi lives in the notification area. Left click shows or hides the bar. The menu offers **Agentes visibles**, **Ocultar/Mostrar barra**, **Siempre visible**, **Modo calma**, **Abrir versión web** and **Salir**. If the shortcut is taken by another program, the tray tooltip says so.
 
 Calm mode, or Windows' *Animation effects* turned off, shows each mascot in a still pose.
 
@@ -62,6 +76,8 @@ Calm mode, or Windows' *Animation effects* turned off, shows each mascot in a st
 | `left`, `top` | top center | Last bar position. Ignored if it is off screen. |
 | `topmost` | `true` | Always on top. |
 | `calm` | `false` | Calm mode. |
+| `hiddenAgents` | `[]` | Agents unchecked in **Agentes visibles**, for example `["codex"]`. |
+| `hotkey` | `Ctrl+Shift+O` | Global show/hide shortcut: modifiers `Ctrl`, `Shift`, `Alt`, `Win` plus a letter, digit or `F1`–`F24`. `""` turns it off. |
 
 The app only reads from the backend (`GET /api/agents`, `GET /api/preferences`, `GET /api/events`, `GET /events`); it never sends commands to agents.
 
