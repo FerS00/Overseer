@@ -23,7 +23,9 @@ const TYPE_LABELS: Record<string, string> = {
 };
 const MAX_EVENTS = 3000;
 const MAX_PAUSED_EVENTS = 250;
-const ROW_HEIGHT = 76;
+const ROW_HEIGHT = 40;
+const MOBILE_ROW_HEIGHT = 56;
+const MOBILE_QUERY = '(max-width: 760px)';
 const OVERSCAN = 8;
 @Component({
   selector: 'app-root',
@@ -65,6 +67,7 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly viewportTop = signal(0);
   readonly viewportHeight = signal(460);
   readonly now = signal(Date.now());
+  readonly rowHeight = signal(ROW_HEIGHT);
   readonly mascotDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mascot-demo') === '1';
   readonly demoStates = signal<Record<string, MascotState>>(Object.fromEntries(this.agentIds.map((id) => [id, 'idle'])));
   readonly lastDemoAgent = signal<string>('claude');
@@ -77,11 +80,13 @@ export class AppComponent implements OnInit, OnDestroy {
       (!q || `${event.title} ${event.detail ?? ''} ${event.tool ?? ''} ${JSON.stringify(event.meta ?? {})}`.toLocaleLowerCase().includes(q)),
     );
   });
+  readonly needsAttention = computed(() => this.visibleProfiles().filter((agent) => ['permission', 'error'].includes(this.mascotStateFor(agent.id))));
   readonly visibleEvents = computed(() => {
     const rows = this.filteredEvents();
-    const start = Math.max(0, Math.floor(this.viewportTop() / ROW_HEIGHT) - OVERSCAN);
-    const end = Math.min(rows.length, Math.ceil((this.viewportTop() + this.viewportHeight()) / ROW_HEIGHT) + OVERSCAN);
-    return rows.slice(start, end).map((event, index) => ({ event, offset: (start + index) * ROW_HEIGHT }));
+    const height = this.rowHeight();
+    const start = Math.max(0, Math.floor(this.viewportTop() / height) - OVERSCAN);
+    const end = Math.min(rows.length, Math.ceil((this.viewportTop() + this.viewportHeight()) / height) + OVERSCAN);
+    return rows.slice(start, end).map((event, index) => ({ event, offset: (start + index) * height }));
   });
   readonly detailTitle = computed(() => this.selected()?.title || this.selected()?.tool || this.typeLabel(this.selected()?.type || 'note'));
   readonly michi = computed(() => this.michiState());
@@ -122,10 +127,12 @@ export class AppComponent implements OnInit, OnDestroy {
   private handoffSub?: Subscription;
   private readonly timers: ReturnType<typeof setInterval>[] = [];
   private previousFocus: HTMLElement | null = null;
+  private floatingCabinMenuCleanup?: () => void;
   private apiState: { agents?: Array<{ agent: string; events: number; tools: number }> } = {};
   private arrivalSequence = 0;
   private readonly latestAgentEvents = new Map<string, { event: AgentEvent; arrival: number }>();
   private readonly latestSessionEvents = new Map<string, { event: AgentEvent; arrival: number }>();
+  private readonly onResize = (): void => this.rowHeight.set(typeof window.matchMedia === 'function' && window.matchMedia(MOBILE_QUERY).matches ? MOBILE_ROW_HEIGHT : ROW_HEIGHT);
   constructor(private readonly svc: EventsService, readonly mascotState: MascotStateService, readonly mascotEngine: MascotEngine) {}
   ngOnInit(): void {
     this.sub = this.svc.stream().subscribe((event) => this.receive(event));
@@ -134,6 +141,8 @@ export class AppComponent implements OnInit, OnDestroy {
     this.loadInitial(); this.loadPreferences();
     this.timers.push(setInterval(() => this.now.set(Date.now()), 1000));
     this.timers.push(setInterval(() => this.refreshSessions(), 15000));
+    this.onResize();
+    window.addEventListener('resize', this.onResize);
     this.readNotificationPreference();
     window.addEventListener('keydown', this.onKeyDown);
   }
@@ -141,6 +150,8 @@ export class AppComponent implements OnInit, OnDestroy {
     this.svc.destroy();
     this.sub?.unsubscribe(); this.modeSub?.unsubscribe(); this.handoffSub?.unsubscribe();
     this.timers.forEach(clearInterval);
+    this.floatingCabinMenuCleanup?.();
+    window.removeEventListener('resize', this.onResize);
     window.removeEventListener('keydown', this.onKeyDown);
   }
   private async loadInitial(): Promise<void> {
@@ -304,12 +315,14 @@ export class AppComponent implements OnInit, OnDestroy {
   stateFor(agent: string): AgentState { return this.states()[agent] || this.freshState(); }
   sessionsFor(agent: string): AgentSession[] { return this.sessionsByAgent()[agent] || []; }
   activeSessions(agent: string): number { return this.sessionsFor(agent).filter((session) => session.state === 'active').length; }
+  sessionCountLabel(agent: string): string { const count = this.activeSessions(agent); return `${count} ${count === 1 ? 'activa' : 'activas'}`; }
   isSubagent(session: AgentSession): boolean { return !!session.parent_session_id; }
   shortCwd(cwd?: string | null): string { return cwd ? cwd.replace(/[\\/]+$/, '').split(/[\\/]/).filter(Boolean).pop() || cwd : 'Ruta desconocida'; }
   relativeTime(value?: string | null): string {
     if (!value) return 'Sin actividad'; const seconds = Math.max(0, Math.floor((this.now() - Date.parse(value)) / 1000));
     if (!Number.isFinite(seconds)) return 'Sin actividad'; if (seconds < 60) return `hace ${seconds}s`; if (seconds < 3600) return `hace ${Math.floor(seconds / 60)}m`; return `hace ${Math.floor(seconds / 3600)}h`;
   }
+  clock(): string { return new Date(this.now()).toLocaleTimeString('es-PE', { hour12: false }); }
   eventTime(value: string): string { const date = new Date(value); return Number.isNaN(date.getTime()) ? '—' : date.toLocaleTimeString('es-PE', { hour12: false }); }
   modeLabel(): string { return ({ live: 'En vivo', reconnecting: 'Reconectando', offline: 'Sin conexión', demo: 'Datos de ejemplo' } as Record<ConnectionMode, string>)[this.mode()]; }
   modeState(): string { return this.mode(); }
@@ -326,6 +339,12 @@ export class AppComponent implements OnInit, OnDestroy {
     this.previousFocus = trigger || document.activeElement as HTMLElement;
     this.selected.set(event);
     requestAnimationFrame(() => this.detailPanel()?.nativeElement.querySelector<HTMLElement>('button')?.focus());
+  }
+  focusCabin(id: string): void {
+    const cabin = document.getElementById(`cabin-${id}`);
+    if (!cabin || cabin.hidden) return;
+    cabin.scrollIntoView({ block: 'center' });
+    cabin.focus({ preventScroll: true });
   }
   closeDetail(): void { if (!this.selected()) return; this.selected.set(null); requestAnimationFrame(() => this.previousFocus?.focus()); }
   async copyDetail(): Promise<void> {
@@ -435,9 +454,41 @@ export class AppComponent implements OnInit, OnDestroy {
     this.preferences.update((value) => ({ ...value, hiddenAgents: value.hiddenAgents.filter((id) => !ids.includes(id)), layout: 'automatic' }));
     await this.savePreferences();
   }
+  positionCabinMenu(event: Event): void {
+    const details = event.currentTarget as HTMLDetailsElement | null;
+    const cabins = details?.closest<HTMLElement>('.cabins');
+    const menu = details?.querySelector<HTMLElement>('.cabin-menu');
+    this.floatingCabinMenuCleanup?.(); this.floatingCabinMenuCleanup = undefined;
+    if (!details?.open || cabins?.dataset['layout'] !== 'row' || !menu) return;
+    menu.style.position = 'fixed'; menu.style.left = '0px'; menu.style.top = '0px'; menu.style.right = 'auto'; menu.style.bottom = 'auto';
+    const close = () => { details.removeAttribute('open'); this.floatingCabinMenuCleanup?.(); this.floatingCabinMenuCleanup = undefined; };
+    window.addEventListener('scroll', close, { passive: true });
+    cabins.addEventListener('scroll', close, { passive: true });
+    this.floatingCabinMenuCleanup = () => {
+      window.removeEventListener('scroll', close);
+      cabins.removeEventListener('scroll', close);
+      menu.style.removeProperty('position'); menu.style.removeProperty('left'); menu.style.removeProperty('top');
+      menu.style.removeProperty('right'); menu.style.removeProperty('bottom');
+    };
+    const position = () => {
+      if (!details.open) return;
+      const summary = details.querySelector<HTMLElement>('summary');
+      if (!summary) return;
+      const summaryRect = summary.getBoundingClientRect();
+      const menuRect = menu.getBoundingClientRect();
+      const margin = 16;
+      const width = menuRect.width || menu.offsetWidth || 210;
+      const height = menuRect.height || menu.scrollHeight;
+      const left = Math.min(Math.max(margin, summaryRect.right - width), window.innerWidth - width - margin);
+      const top = Math.min(summaryRect.bottom + 4, window.innerHeight - height - margin);
+      menu.style.left = `${left}px`; menu.style.top = `${Math.max(margin, top)}px`;
+    };
+    position(); requestAnimationFrame(position);
+  }
   async cabinAction(id: string, action: string, event?: Event): Promise<void> {
     const menu = (event?.target as HTMLElement | undefined)?.closest('details');
     menu?.querySelector<HTMLElement>('summary')?.focus();
+    this.floatingCabinMenuCleanup?.(); this.floatingCabinMenuCleanup = undefined;
     menu?.removeAttribute('open');
     if (action === 'hide') return this.hideAgents([id]);
     if (action === 'up' || action === 'down') return this.moveAgent(id, action === 'up' ? -1 : 1);

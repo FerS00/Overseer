@@ -38,7 +38,7 @@ public sealed class AgentSlotViewModel(AgentInfo agent) : Observable
     public string ActivityLabel => snapshot.Label;
     public string Tool => snapshot.Tool ?? "—";
     public bool HasTool => snapshot.Tool is not null;
-    public string TargetKind => snapshot.Target is { } target ? MascotLabels.TargetKinds[target.Kind] : "DETALLE";
+    public string TargetKind => snapshot.Target is { } target ? MascotLabels.TargetKinds[target.Kind].ToLowerInvariant() : "detalle";
     /// <summary>Full target or first detail line; the flyout wraps it inside a scrollable area.</summary>
     public string TargetText => snapshot.Target?.Text
         ?? (FirstLine(snapshot.Detail) is { Length: > 0 } detail ? detail : snapshot.Title ?? "Sin actividad todavía");
@@ -60,13 +60,30 @@ public sealed class AgentSlotViewModel(AgentInfo agent) : Observable
     public string SinceText => snapshot.StateSince == DateTimeOffset.MinValue ? "—" : Duration(now - snapshot.StateSince);
     public string LastText => snapshot.LastEventAt is { } last ? $"hace {Duration(now - last)}" : "Sin eventos";
     public string AutomationName => $"{MascotName}, {Name}: {ActivityLabel.ToLowerInvariant()}";
+    public double MeterFraction
+    {
+        get
+        {
+            if (snapshot.State is MascotState.Permission or MascotState.Error) return 1;
+            if (snapshot.State is MascotState.Idle or MascotState.Sleeping || snapshot.StateSince == DateTimeOffset.MinValue) return 0;
+            if (now <= snapshot.StateSince) return 0;
+            var seconds = (now - snapshot.StateSince).TotalSeconds;
+            return (seconds % 60) / 60;
+        }
+    }
+    public Brush MeterBrush => snapshot.State switch
+    {
+        MascotState.Permission => StateColor("#F2B53A"),
+        MascotState.Error => StateColor("#FF6E5A"),
+        _ => Accent,
+    };
     public Brush StateBrush => Freeze(new SolidColorBrush((Color)ColorConverter.ConvertFromString(snapshot.State switch
     {
-        MascotState.Thinking => "#A99BFF",
-        MascotState.Reading or MascotState.Editing or MascotState.Running or MascotState.Done => "#4ADE80",
-        MascotState.Permission => "#FBBF24",
-        MascotState.Error => "#F87171",
-        _ => "#98A2B8",
+        MascotState.Thinking => "#ECE8DF",
+        MascotState.Reading or MascotState.Editing or MascotState.Running or MascotState.Done => "#8FD48A",
+        MascotState.Permission => "#F2B53A",
+        MascotState.Error => "#FF6E5A",
+        _ => "#A29E94",
     })));
 
     public bool IsSelected { get => selected; set => Set(ref selected, value); }
@@ -75,13 +92,14 @@ public sealed class AgentSlotViewModel(AgentInfo agent) : Observable
     {
         snapshot = next;
         foreach (var name in new[] { nameof(State), nameof(StateLabel), nameof(ShortLabel), nameof(ActivityLabel), nameof(Tool), nameof(HasTool),
-            nameof(TargetKind), nameof(TargetText), nameof(FullDetail), nameof(HasFullDetail), nameof(CopyText), nameof(CanCopy), nameof(Session), nameof(SinceText), nameof(LastText), nameof(AutomationName), nameof(StateBrush) })
+            nameof(TargetKind), nameof(TargetText), nameof(FullDetail), nameof(HasFullDetail), nameof(CopyText), nameof(CanCopy), nameof(Session), nameof(SinceText), nameof(LastText), nameof(AutomationName), nameof(MeterFraction), nameof(MeterBrush), nameof(StateBrush) })
             Raise(name);
     }
 
     public void Tick(DateTimeOffset value)
     {
         now = value;
+        Raise(nameof(MeterFraction));
         Raise(nameof(SinceText));
         Raise(nameof(LastText));
     }
@@ -97,6 +115,7 @@ public sealed class AgentSlotViewModel(AgentInfo agent) : Observable
     private const int MaxDetail = 4000;
     private static string FirstLine(string? text) => (text ?? "").Split('\n')[0].Trim();
     private static Brush Freeze(Brush brush) { brush.Freeze(); return brush; }
+    private static Brush StateColor(string value) => Freeze(new SolidColorBrush((Color)ColorConverter.ConvertFromString(value)));
 }
 
 public sealed class BarViewModel : Observable
@@ -120,10 +139,11 @@ public sealed class BarViewModel : Observable
         }
     }
 
-    public ConnectionStatus Status { get => status; set { Set(ref status, value); Raise(nameof(StatusText)); Raise(nameof(StatusBrush)); } }
+    public ConnectionStatus Status { get => status; set { Set(ref status, value); Raise(nameof(StatusText)); Raise(nameof(StatusShort)); Raise(nameof(StatusBrush)); } }
     public string StatusText => status switch { ConnectionStatus.Live => "En vivo", ConnectionStatus.Connecting => "Conectando…", _ => "Sin conexión con Overseer" };
+    public string StatusShort => status switch { ConnectionStatus.Live => "en vivo", ConnectionStatus.Connecting => "conectando", _ => "sin conexión" };
     public Brush StatusBrush => new SolidColorBrush((Color)ColorConverter.ConvertFromString(status switch
     {
-        ConnectionStatus.Live => "#4ADE80", ConnectionStatus.Connecting => "#FBBF24", _ => "#F87171",
+        ConnectionStatus.Live => "#8FD48A", ConnectionStatus.Connecting => "#F2B53A", _ => "#FF6E5A",
     }));
 }

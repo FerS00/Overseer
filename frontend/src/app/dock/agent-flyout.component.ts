@@ -45,8 +45,8 @@ import { activityLabel, capitalize, DockAgent, formatDuration, MASCOT_NAMES } fr
       </ol>
     </div>
     <div class="fly-foot">
-      <button class="primary-button" type="button" aria-controls="flyout-events" [attr.aria-expanded]="eventsOpen()" (click)="eventsOpen.set(!eventsOpen())">{{ eventsOpen() ? 'Ocultar eventos' : 'Ver eventos' }}</button>
       <button class="secondary-button" type="button" (click)="closed.emit()">Cerrar</button>
+      <button class="primary-button" type="button" aria-controls="flyout-events" [attr.aria-expanded]="eventsOpen()" (click)="eventsOpen.set(!eventsOpen())">{{ eventsOpen() ? 'Ocultar eventos' : 'Ver eventos' }}</button>
     </div>
     <div class="fly-events" id="flyout-events" [hidden]="!eventsOpen()">
       <span class="section-label">Eventos de {{ agent().name }}</span>

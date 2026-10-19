@@ -4,16 +4,20 @@
              ShutdownMode="OnExplicitShutdown">
   <Application.Resources>
     <!-- Dark-only tokens from design-system/agent-ops/DESIGN.md. -->
-    <SolidColorBrush x:Key="Surface" Color="#11151F" />
-    <SolidColorBrush x:Key="Surface2" Color="#171C29" />
-    <SolidColorBrush x:Key="Stage" Color="#0D1119" />
-    <SolidColorBrush x:Key="Line" Color="#222A3B" />
-    <SolidColorBrush x:Key="LineStrong" Color="#6E7A96" />
-    <SolidColorBrush x:Key="Fg" Color="#E8ECF4" />
-    <SolidColorBrush x:Key="Muted" Color="#98A2B8" />
-    <SolidColorBrush x:Key="Brand" Color="#A99BFF" />
-    <SolidColorBrush x:Key="OnBrand" Color="#0A0D14" />
-    <SolidColorBrush x:Key="Ring" Color="#C9C2FF" />
+    <SolidColorBrush x:Key="Bg" Color="#0D0D0C" />
+    <SolidColorBrush x:Key="Panel" Color="#141413" />
+    <SolidColorBrush x:Key="Raise" Color="#1B1B19" />
+    <SolidColorBrush x:Key="Well" Color="#0A0A09" />
+    <SolidColorBrush x:Key="Rule" Color="#262623" />
+    <SolidColorBrush x:Key="RuleStrong" Color="#6A675F" />
+    <SolidColorBrush x:Key="Fg" Color="#ECE8DF" />
+    <SolidColorBrush x:Key="Muted" Color="#A29E94" />
+    <SolidColorBrush x:Key="Dim" Color="#858178" />
+    <SolidColorBrush x:Key="Ring" Color="#ECE8DF" />
+    <SolidColorBrush x:Key="Warn" Color="#F2B53A" />
+    <SolidColorBrush x:Key="WarnTint" Color="#12F2B53A" />
+    <SolidColorBrush x:Key="Bad" Color="#FF6E5A" />
+    <SolidColorBrush x:Key="Ok" Color="#8FD48A" />
     <FontFamily x:Key="Mono">Cascadia Mono, Consolas, Courier New</FontFamily>
     <FontFamily x:Key="Body">Segoe UI Variable Text, Segoe UI</FontFamily>
     <BooleanToVisibilityConverter x:Key="Visible" />
@@ -28,7 +32,7 @@
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="ContextMenu">
-            <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource LineStrong}" BorderThickness="1" CornerRadius="12" Padding="4" MinWidth="220">
+            <Border Background="{StaticResource Panel}" BorderBrush="#3A3A35" BorderThickness="1" CornerRadius="6" Padding="4" MinWidth="220">
               <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle" />
             </Border>
           </ControlTemplate>
@@ -44,14 +48,14 @@
             <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="8,6" Margin="0,1">
               <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="22" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                <TextBlock x:Name="Check" Text="✓" Foreground="{StaticResource Brand}" FontWeight="Bold" Visibility="Hidden" VerticalAlignment="Center" />
+                <TextBlock x:Name="Check" Text="✓" Foreground="{StaticResource Fg}" FontWeight="Bold" Visibility="Hidden" VerticalAlignment="Center" />
                 <ContentPresenter Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center" />
                 <TextBlock Grid.Column="2" Text="{TemplateBinding InputGestureText}" Foreground="{StaticResource Muted}" FontFamily="{StaticResource Mono}" FontSize="11" Margin="16,0,0,0" VerticalAlignment="Center" />
               </Grid>
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsChecked" Value="True"><Setter TargetName="Check" Property="Visibility" Value="Visible" /></Trigger>
-              <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Bd" Property="Background" Value="{StaticResource Surface2}" /></Trigger>
+              <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Bd" Property="Background" Value="{StaticResource Raise}" /></Trigger>
               <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".45" /></Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
@@ -62,14 +66,14 @@
       <Setter Property="OverridesDefaultStyle" Value="True" />
       <Setter Property="Template">
         <Setter.Value>
-          <ControlTemplate TargetType="Separator"><Rectangle Height="1" Fill="{StaticResource Line}" Margin="8,4" /></ControlTemplate>
+          <ControlTemplate TargetType="Separator"><Rectangle Height="1" Fill="{StaticResource Rule}" Margin="8,4" /></ControlTemplate>
         </Setter.Value>
       </Setter>
     </Style>
     <Style x:Key="MenuSection" TargetType="TextBlock">
       <Setter Property="FontFamily" Value="{StaticResource Mono}" />
       <Setter Property="FontSize" Value="10" />
-      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="FontWeight" Value="Normal" />
       <Setter Property="Foreground" Value="{StaticResource Muted}" />
       <Setter Property="Margin" Value="12,6,12,4" />
     </Style>
@@ -85,7 +89,7 @@
               <Track.Thumb>
                 <Thumb>
                   <Thumb.Template>
-                    <ControlTemplate TargetType="Thumb"><Border CornerRadius="3" Background="{StaticResource LineStrong}" Opacity=".75" /></ControlTemplate>
+                    <ControlTemplate TargetType="Thumb"><Border CornerRadius="3" Background="{StaticResource RuleStrong}" Opacity=".75" /></ControlTemplate>
                   </Thumb.Template>
                 </Thumb>
               </Track.Thumb>

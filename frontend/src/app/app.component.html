@@ -8,18 +8,18 @@
   <header class="topbar">
     <div class="brand-lockup">
       <ao-michi class="header-mascot" [state]="michi()" [lights]="visibleProfiles().length" [indicators]="michiIndicators()" [lastAgent]="mascotDemo ? lastDemoAgent() : mascotState.lastActiveAgent()"></ao-michi>
-      <div><p class="eyebrow">Monitor local</p><h1>Overseer</h1></div>
+      <h1 aria-label="Overseer">overseer</h1><span class="brand-subtitle">monitor local · solo lectura</span>
     </div>
     <div class="topbar-controls">
-      <div class="connection" [attr.data-mode]="modeState()" role="status" aria-live="polite"><span class="connection-dot"></span><span>{{ modeLabel() }}</span></div>
-      <button class="icon-button" type="button" [attr.aria-pressed]="paused()" (click)="pause()" [attr.aria-label]="paused() ? 'Reanudar línea de tiempo' : 'Pausar línea de tiempo'" [title]="paused() ? 'Reanudar (P)' : 'Pausar (P)'">
-        @if (paused()) { <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 12 7-12 7z"/></svg> } @else { <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zm7 0h4v14h-4z"/></svg> }
-      </button>
-      <button class="icon-button" type="button" [attr.aria-pressed]="mascotEngine.calm()" (click)="toggleCalm()" aria-label="Modo calma" title="Modo calma (C)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14c2.6-5.2 5.7-5.2 8.4 0s5.7 5.2 8.3 0M4 19c2.5-3.2 5.3-3.2 7.8 0s5.3 3.2 7.8 0"/></svg></button>
-      <button class="icon-button notification-toggle" type="button" [attr.aria-pressed]="notificationEnabled()" (click)="toggleNotifications()" aria-label="Notificaciones de Overseer" title="Notificaciones de Overseer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></button>
-      @if (viewOverride()) { <button class="secondary-button" type="button" (click)="backToDock()">Volver al dock</button> }
-      <button class="icon-button settings-button" type="button" (click)="openSettings($any($event.currentTarget))" aria-label="Ajustes de vista" title="Ajustes de vista"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1" fill="none"/></svg></button>
-      <button class="icon-button help-button" type="button" (click)="toggleHelp()" aria-label="Ayuda y atajos de teclado" title="Ayuda (?)">?</button>
+      <div class="connection" [attr.data-mode]="modeState()" role="status" aria-live="polite"><span class="connection-dot"></span><span>{{ modeLabel() }}</span><time>{{ clock() }}</time></div>
+      <div class="tools" role="toolbar" aria-label="Controles">
+        <button class="tool-button" type="button" [attr.aria-pressed]="paused()" (click)="pause()" [attr.aria-label]="paused() ? 'Reanudar línea de tiempo' : 'Pausar línea de tiempo'" [title]="paused() ? 'Reanudar (P)' : 'Pausar (P)'"><span>{{ paused() ? 'reanudar' : 'pausa' }}</span><kbd>P</kbd></button>
+        <button class="tool-button" type="button" [attr.aria-pressed]="mascotEngine.calm()" (click)="toggleCalm()" aria-label="Modo calma" title="Modo calma (C)"><span>calma</span><kbd>C</kbd></button>
+        <button class="tool-button notification-toggle" type="button" [attr.aria-pressed]="notificationEnabled()" (click)="toggleNotifications()" aria-label="Notificaciones de Overseer" title="Notificaciones de Overseer"><span>avisos</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg></button>
+        @if (viewOverride()) { <button class="secondary-button" type="button" (click)="backToDock()">Volver al dock</button> }
+        <button class="tool-button settings-button" type="button" (click)="openSettings($any($event.currentTarget))" aria-label="Ajustes de vista" title="Ajustes de vista"><span>vista</span><kbd>V</kbd></button>
+        <button class="tool-button help-button" type="button" (click)="toggleHelp()" aria-label="Ayuda y atajos de teclado" title="Ayuda (?)"><kbd>?</kbd></button>
+      </div>
     </div>
   </header>
 
@@ -28,6 +28,21 @@
       <span>Datos de ejemplo · estado de mascotas</span>
       @for (agent of profiles(); track agent.id) { <label>{{ agent.name }} <select [attr.aria-label]="'Estado de ejemplo de ' + agent.name" [value]="demoStates()[agent.id]" (change)="setDemoState(agent.id, $event)">@for (state of mascotOptions; track state) { <option [value]="state">{{ statusLabel(state) }}</option> }</select></label> }
     </div>
+  }
+
+  @if (needsAttention().length) {
+    <section class="needs" aria-label="Agentes que te necesitan">
+      @for (agent of needsAttention(); track agent.id) {
+        <div class="need" [attr.data-kind]="mascotStateFor(agent.id)">
+          <i class="needs-light" aria-hidden="true"></i>
+          <span class="need-tag">{{ mascotStateFor(agent.id) === 'permission' ? 'PIDE PERMISO' : 'ERROR' }}</span>
+          <span class="need-who" [style.color]="agent.color">{{ agent.name }}</span>
+          <code [title]="stateFor(agent.id).detail || stateFor(agent.id).title">{{ stateFor(agent.id).detail || stateFor(agent.id).title }}</code>
+          <time>{{ relativeTime(stateFor(agent.id).lastTs) }}</time>
+          <button class="secondary-button" type="button" (click)="focusCabin(agent.id)">Ver tarea</button>
+        </div>
+      }
+    </section>
   }
 
   <main>
@@ -47,25 +62,11 @@
     }
     @if (preferenceError()) { <p role="status" class="quiet">{{ preferenceError() }}</p> }
     @if (visibleProfiles().length === 0) { <section class="empty-state"><ao-michi class="empty-mascot" [state]="'sleeping'" [lights]="0"></ao-michi><div><h2>{{ detectedProfiles().length ? 'No hay agentes visibles' : 'No se detectaron agentes' }}</h2><p>{{ detectedProfiles().length ? 'Recupera los agentes con los botones Mostrar.' : 'Instala un agente compatible o indica su ruta de configuración para detectarlo.' }}</p></div></section> }
+
+    <div class="section-head"><h2>Agentes</h2><span>{{ visibleProfiles().length }} detectados</span></div>
     <section class="cabins" [attr.data-layout]="preferences().layout" [attr.data-density]="preferences().density" [attr.data-focus]="preferences().focusAgent" [attr.data-count]="visibleProfiles().length" [style.--cabin-count]="visibleProfiles().length" aria-label="Agentes">
       @for (agent of visibleProfiles(); track agent.id; let i = $index) {
-        <article class="cabin" [class]="'cabin agent-' + agent.id" [style.--agent-color]="agent.color" [class.cabin-selected]="selectedAgents().includes(agent.id)" (dragover)="$event.preventDefault()" (drop)="dropAgent(agent.id, $event)" [hidden]="preferences().layout === 'focus' && agent.id !== preferences().focusAgent">
-          <header class="cabin-header">
-            <div class="cabin-identity"><button class="drag-handle" type="button" draggable="true" (dragstart)="startDrag(agent.id, $event)" (dragend)="draggedAgent.set(null)" [attr.aria-label]="'Mover ' + agent.name" [title]="'Arrastra para mover; usa Opciones para mover con teclado'">⠿</button><div><p class="eyebrow">{{ agent.id }}</p><h2>{{ agent.name }}</h2></div></div>
-            <div class="cabin-controls">
-              <label class="cabin-select" [title]="'Seleccionar ' + agent.name"><input type="checkbox" [checked]="selectedAgents().includes(agent.id)" (change)="selectAgent(agent.id)" [attr.aria-label]="'Seleccionar ' + agent.name" /></label>
-              <details class="cabin-options"><summary [attr.aria-label]="'Opciones de ' + agent.name" title="Opciones de la cabina">⋯</summary><div class="cabin-menu">
-                <button type="button" (click)="cabinAction(agent.id, 'focus', $event)">Enfocar {{ agent.name }}</button>
-                <button type="button" (click)="cabinAction(agent.id, 'automatic', $event)">Vista automática</button>
-                <button type="button" (click)="cabinAction(agent.id, 'row', $event)">Vista en fila</button>
-                <button type="button" (click)="cabinAction(agent.id, 'density', $event)">{{ preferences().density === 'compact' ? 'Ampliar cabinas' : 'Compactar cabinas' }}</button>
-                <button type="button" [disabled]="i === 0" (click)="cabinAction(agent.id, 'up', $event)" [attr.aria-label]="'Subir ' + agent.name">Mover antes</button>
-                <button type="button" [disabled]="i === visibleProfiles().length - 1" (click)="cabinAction(agent.id, 'down', $event)" [attr.aria-label]="'Bajar ' + agent.name">Mover después</button>
-                <button type="button" (click)="cabinAction(agent.id, 'hide', $event)">Ocultar {{ agent.name }}</button>
-              </div></details>
-            </div>
-            <span class="status-pill" [attr.data-status]="mascotStateFor(agent.id)"><i aria-hidden="true"></i>{{ statusLabel(mascotStateFor(agent.id)) }}</span>
-          </header>
+        <article class="cabin" [class]="'cabin agent-' + agent.id" [style.--agent-color]="agent.color" [attr.data-state]="mascotStateFor(agent.id)" [attr.id]="'cabin-' + agent.id" tabindex="-1" [class.cabin-selected]="selectedAgents().includes(agent.id)" (dragover)="$event.preventDefault()" (drop)="dropAgent(agent.id, $event)" [hidden]="preferences().layout === 'focus' && agent.id !== preferences().focusAgent">
           <div class="cabin-scene">
             <ao-activity-badge class="cabin-badge" [activity]="activityOf(agent.id)"></ao-activity-badge>
             @switch (agent.mascot) {
@@ -74,59 +75,69 @@
               @case ('astro') { <ao-astro class="cabin-mascot" [state]="mascotStateFor(agent.id)"></ao-astro> }
               @case ('hondo') { <ao-hondo class="cabin-mascot" [state]="mascotStateFor(agent.id)"></ao-hondo> }
             }
+          </div>
+          <div class="cabin-readout">
+            <header class="cabin-header">
+              <div class="cabin-identity"><button class="drag-handle" type="button" draggable="true" (dragstart)="startDrag(agent.id, $event)" (dragend)="draggedAgent.set(null)" [attr.aria-label]="'Mover ' + agent.name" [title]="'Arrastra para mover; usa Opciones para mover con teclado'">⠿</button><div><h2>{{ agent.name }}</h2><span class="mascot-name">{{ agent.mascot }}</span></div></div>
+                <div class="cabin-controls">
+                <label class="cabin-select" [title]="'Seleccionar ' + agent.name"><input type="checkbox" [checked]="selectedAgents().includes(agent.id)" (change)="selectAgent(agent.id)" [attr.aria-label]="'Seleccionar ' + agent.name" /></label>
+                <details class="cabin-options" (toggle)="positionCabinMenu($event)"><summary [attr.aria-label]="'Opciones de ' + agent.name" title="Opciones de la cabina">⋯</summary><div class="cabin-menu">
+                  <button type="button" (click)="cabinAction(agent.id, 'focus', $event)">Enfocar {{ agent.name }}</button>
+                  <button type="button" (click)="cabinAction(agent.id, 'automatic', $event)">Vista automática</button>
+                  <button type="button" (click)="cabinAction(agent.id, 'row', $event)">Vista en fila</button>
+                  <button type="button" (click)="cabinAction(agent.id, 'density', $event)">{{ preferences().density === 'compact' ? 'Ampliar cabinas' : 'Compactar cabinas' }}</button>
+                  <button type="button" [disabled]="i === 0" (click)="cabinAction(agent.id, 'up', $event)" [attr.aria-label]="'Subir ' + agent.name">Mover antes</button>
+                  <button type="button" [disabled]="i === visibleProfiles().length - 1" (click)="cabinAction(agent.id, 'down', $event)" [attr.aria-label]="'Bajar ' + agent.name">Mover después</button>
+                  <button type="button" (click)="cabinAction(agent.id, 'hide', $event)">Ocultar {{ agent.name }}</button>
+                </div></details>
+              </div>
+              <span class="status-pill" [attr.data-status]="mascotStateFor(agent.id)"><i aria-hidden="true"></i>{{ statusLabel(mascotStateFor(agent.id)) }}</span>
+            </header>
             <section class="now-card" aria-label="Ahora">
-              <span class="section-label">Ahora</span>
               @if (activityFor(agent.id)) { <span class="now-activity">{{ activityFor(agent.id) }}</span> }
               <strong>{{ stateFor(agent.id).title }}</strong>
-              @if (stateFor(agent.id).detail) { <code>{{ stateFor(agent.id).detail }}</code> }
+              @if (stateFor(agent.id).detail) { <code [title]="stateFor(agent.id).detail">{{ stateFor(agent.id).detail }}</code> }
               @else if (!stateFor(agent.id).lastTs) { <span class="quiet">Sin actividad reciente</span> }
             </section>
+            <div class="cabin-meta" aria-label="Métricas del agente"><span>última <b>{{ relativeTime(stateFor(agent.id).lastTs) }}</b></span><span><b>{{ totalFor(agent.id, 'tools') }}</b> herramientas</span><span><b>{{ totalFor(agent.id, 'events') }}</b> eventos</span></div>
+            <section class="sessions-block" [attr.aria-label]="'Sesiones de ' + agent.name">
+              <div class="sessions-heading"><h3>Sesiones</h3><span>{{ sessionCountLabel(agent.id) }}</span></div>
+              @if (sessionsFor(agent.id).length === 0) { <p class="quiet no-sessions">Todavía no hay sesiones</p> }
+              <ul class="session-list">
+                @for (session of sessionsFor(agent.id); track session.id) {
+                  <li [class.subagent]="isSubagent(session)">
+                    <button class="session-button" type="button" (click)="selectSession(session)" [attr.aria-label]="'Filtrar por sesión ' + shortCwd(session.cwd) + ', ' + session.state">
+                      <span class="session-state" [attr.data-status]="session.state">{{ session.state === 'active' ? 'Activa' : session.state === 'idle' ? 'Inactiva' : 'Finalizada' }}</span>
+                      <span class="session-main"><strong>{{ shortCwd(session.cwd) }}</strong><span>{{ session.model || 'Modelo no indicado' }} · {{ session.last_action || session.lastAction || 'Sin actividad' }}</span></span>
+                      <time class="tabular">{{ relativeTime(session.last_event_at) }}</time>
+                    </button>
+                  </li>
+                }
+              </ul>
+            </section>
           </div>
-          <div class="agent-metrics" aria-label="Métricas del agente">
-            <div><span>Herramientas</span><strong>{{ totalFor(agent.id, 'tools') }}</strong></div>
-            <div><span>Eventos</span><strong>{{ totalFor(agent.id, 'events') }}</strong></div>
-            <div><span>Última actividad</span><strong class="tabular">{{ relativeTime(stateFor(agent.id).lastTs) }}</strong></div>
-          </div>
-          <section class="sessions-block" [attr.aria-label]="'Sesiones de ' + agent.name">
-            <div class="sessions-heading"><h3>Sesiones</h3><span>{{ activeSessions(agent.id) }} activas</span></div>
-            @if (sessionsFor(agent.id).length === 0) { <p class="quiet no-sessions">Todavía no hay sesiones</p> }
-            <ul class="session-list">
-              @for (session of sessionsFor(agent.id); track session.id) {
-                <li [class.subagent]="isSubagent(session)">
-                  <button class="session-button" type="button" (click)="selectSession(session)" [attr.aria-label]="'Filtrar por sesión ' + shortCwd(session.cwd) + ', ' + session.state">
-                    <span class="session-state" [attr.data-status]="session.state">{{ session.state === 'active' ? 'Activa' : session.state === 'idle' ? 'Inactiva' : 'Finalizada' }}</span>
-                    <span class="session-main"><strong>{{ shortCwd(session.cwd) }}</strong><span>{{ session.model || 'Modelo no indicado' }} · {{ session.last_action || session.lastAction || 'Sin actividad' }}</span></span>
-                    <time class="tabular">{{ relativeTime(session.last_event_at) }}</time>
-                  </button>
-                </li>
-              }
-            </ul>
-          </section>
         </article>
       }
     </section>
 
     <section class="timeline-panel" aria-labelledby="timeline-title">
-      <header class="timeline-heading">
-        <div><p class="eyebrow">Registro en vivo</p><h2 id="timeline-title">Línea de tiempo</h2></div>
-        <div class="timeline-count"><span class="live-indicator" aria-hidden="true"></span>{{ filteredEvents().length }} eventos</div>
-      </header>
+      <header class="timeline-heading section-head"><h2 id="timeline-title">Registro</h2><span>{{ filteredEvents().length }} eventos</span></header>
       <div class="filters" aria-label="Filtros de eventos">
         <div class="agent-filters" role="group" aria-label="Filtrar por agente">
-          <button type="button" [class.selected]="agentFilter() === 'all'" [attr.aria-pressed]="agentFilter() === 'all'" (click)="onAgentFilter('all')">Todos</button>
-          @for (agent of visibleProfiles(); track agent.id) { <button type="button" [class.selected]="agentFilter() === agent.id" [attr.aria-pressed]="agentFilter() === agent.id" (click)="onAgentFilter(agent.id)">{{ agent.name }}</button> }
+          <button type="button" [class.selected]="agentFilter() === 'all'" [attr.aria-pressed]="agentFilter() === 'all'" (click)="onAgentFilter('all')">todos</button>
+          @for (agent of visibleProfiles(); track agent.id) { <button type="button" [class.selected]="agentFilter() === agent.id" [attr.aria-pressed]="agentFilter() === agent.id" (click)="onAgentFilter(agent.id)"><span class="filter-swatch" [style.background]="agent.color" aria-hidden="true"></span>{{ agent.name }}</button> }
         </div>
-        <label>Sesión<select [value]="sessionFilter()" (change)="onSessionFilter($event)"><option value="all">Todas</option>@for (session of sessions(); track session.id) { <option [value]="session.id">{{ session.agent }} · {{ shortCwd(session.cwd) }}</option> }</select></label>
-        <label>Tipo<select [value]="typeFilter()" (change)="onTypeFilter($event)"><option value="all">Todos</option>@for (type of eventTypes; track type) { <option [value]="type">{{ typeLabel(type) }}</option> }</select></label>
-        <label class="search-label">Texto<input #searchInput type="search" placeholder="Buscar en eventos" [value]="textFilter()" (input)="onTextFilter($event)" /></label>
-        @if (sessionFilter() !== 'all') { <button class="clear-filter" type="button" (click)="clearSessionFilter()">Quitar sesión</button> }
-        <button class="load-more" type="button" (click)="loadMore()" [disabled]="loadingMore() || !canLoadMore()">{{ loadingMore() ? 'Cargando…' : canLoadMore() ? 'Cargar más' : 'Historial completo' }}</button>
+        <label>sesión<select [value]="sessionFilter()" (change)="onSessionFilter($event)"><option value="all">todas</option>@for (session of sessions(); track session.id) { <option [value]="session.id">{{ session.agent }} · {{ shortCwd(session.cwd) }}</option> }</select></label>
+        <label>tipo<select [value]="typeFilter()" (change)="onTypeFilter($event)"><option value="all">todos</option>@for (type of eventTypes; track type) { <option [value]="type">{{ typeLabel(type) }}</option> }</select></label>
+        <label class="search-label"><span>texto</span><div class="search-box"><span aria-hidden="true">/</span><input #searchInput type="search" placeholder="buscar en eventos" [value]="textFilter()" (input)="onTextFilter($event)" /></div></label>
+        @if (sessionFilter() !== 'all') { <button class="clear-filter secondary-button" type="button" (click)="clearSessionFilter()">Quitar sesión</button> }
+        <button class="load-more secondary-button" type="button" (click)="loadMore()" [disabled]="loadingMore() || !canLoadMore()">{{ loadingMore() ? 'Cargando…' : canLoadMore() ? 'Cargar más' : 'Historial completo' }}</button>
       </div>
 
       @if (events().length === 0) {
         <section class="empty-state" aria-labelledby="empty-title">
           <ao-michi class="empty-mascot" [state]="'sleeping'" [lights]="0"></ao-michi>
-          <div><p class="eyebrow">Michi está esperando</p><h3 id="empty-title">Conecta tus agentes</h3><p>Configura las integraciones de tus agentes para que las sesiones aparezcan aquí.</p>
+          <div><p class="section-label">Michi está esperando</p><h3 id="empty-title">Conecta tus agentes</h3><p>Configura las integraciones de tus agentes para que las sesiones aparezcan aquí.</p>
             <div class="setup-agent"><strong>Claude Code y Codex</strong><div class="command-row"><code>node integrations/wire-up.mjs</code><button type="button" (click)="copyCommand('node integrations/wire-up.mjs')" aria-label="Copiar comando wire-up">Copiar</button></div><div class="command-row"><code>node integrations/wire-up.mjs --apply</code><button type="button" (click)="copyCommand('node integrations/wire-up.mjs --apply')" aria-label="Copiar comando wire-up apply">Copiar</button></div><p>En Codex, ejecuta <code>/hooks</code> y confía en los hooks de Overseer.</p></div>
             <div class="command-row"><code>node integrations/doctor.mjs</code><button type="button" (click)="copyCommand('node integrations/doctor.mjs')" aria-label="Copiar comando doctor">Copiar</button></div>
           </div>
@@ -135,7 +146,7 @@
         <p class="no-matches">No hay eventos para estos filtros.</p>
       } @else {
         <div #eventViewport class="event-viewport" role="region" aria-label="Eventos" (scroll)="onScroll($event)">
-          <div class="virtual-spacer" [style.height.px]="filteredEvents().length * 76">
+          <div class="virtual-spacer" [style.height.px]="filteredEvents().length * rowHeight()">
             @for (row of visibleEvents(); track eventKeyForTemplate(row.event)) {
               <button class="timeline-row" type="button" [attr.data-agent]="row.event.agent" [style.transform]="'translateY(' + row.offset + 'px)'" (click)="openDetail(row.event, $any($event.currentTarget))">
                 <time class="tabular">{{ eventTime(row.event.ts) }}</time>
@@ -152,7 +163,7 @@
     </section>
   </main>
 
-  <footer class="page-footer"><span>Solo lectura · ejecución local</span><span>Presiona <kbd>?</kbd> para ver atajos</span></footer>
+  <footer class="page-footer"><span>solo lectura · ejecución local</span><span>{{ visibleProfiles().length }} agentes visibles</span><span class="right"><kbd>?</kbd> atajos</span></footer>
 </div>
 }
 
@@ -162,7 +173,7 @@
 @if (selected(); as event) {
   <div class="detail-backdrop" (click)="closeDetail()" aria-hidden="true"></div>
   <aside #detailPanel class="detail-panel" role="dialog" aria-modal="true" aria-labelledby="detail-title" tabindex="-1">
-    <header class="detail-header"><div><p class="eyebrow">Detalle del evento</p><h2 id="detail-title">Detalle del evento: {{ detailTitle() }}</h2></div><button class="icon-button" type="button" (click)="closeDetail()" aria-label="Cerrar detalle">×</button></header>
+    <header class="detail-header"><div><p class="section-label">Detalle del evento</p><h2 id="detail-title">Detalle del evento: {{ detailTitle() }}</h2></div><button class="icon-button" type="button" (click)="closeDetail()" aria-label="Cerrar detalle">×</button></header>
     <div class="detail-actions"><button class="secondary-button" type="button" (click)="copyDetail()">Copiar evento</button><button class="secondary-button" type="button" [disabled]="!event.session_id" (click)="selectSession({ id: event.session_id || '', agent: event.agent, started_at: event.ts, last_event_at: event.ts, state: 'active' })">Filtrar esta sesión</button></div>
     <dl class="detail-fields">
       <div><dt>Agente</dt><dd>{{ agentName(event.agent) }}</dd></div><div><dt>Tipo</dt><dd>{{ typeLabel(event.type) }} <code>{{ event.type }}</code></dd></div>
@@ -178,7 +189,7 @@
 @if (helpOpen()) {
   <div class="modal-backdrop" (click)="toggleHelp()">
     <section #helpDialog class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="help-title" (click)="$event.stopPropagation()">
-      <header><div><p class="eyebrow">Ayuda rápida</p><h2 id="help-title">Atajos de teclado</h2></div><button class="icon-button" type="button" (click)="toggleHelp()" aria-label="Cerrar ayuda">×</button></header>
+      <header><div><p class="section-label">Ayuda rápida</p><h2 id="help-title">Atajos de teclado</h2></div><button class="icon-button" type="button" (click)="toggleHelp()" aria-label="Cerrar ayuda">×</button></header>
       <dl><div><dt><kbd>/</kbd></dt><dd>Enfocar búsqueda</dd></div><div><dt><kbd>1–4</kbd></dt><dd>Filtrar agentes por posición</dd></div><div><dt><kbd>0</kbd></dt><dd>Mostrar todos</dd></div><div><dt><kbd>P</kbd></dt><dd>Pausar o reanudar línea de tiempo</dd></div><div><dt><kbd>C</kbd></dt><dd>Activar o desactivar modo calma</dd></div><div><dt><kbd>Esc</kbd></dt><dd>Cerrar panel o ayuda</dd></div></dl>
       <p class="quiet">Los atajos no se activan mientras escribes en un campo.</p>
     </section>
@@ -187,4 +198,4 @@
 
 <div class="sr-only" aria-live="polite" aria-atomic="true">{{ mascotState.announcement() }}</div>
 <div class="sr-only" aria-live="polite" aria-atomic="true">{{ reorderAnnouncement() }}</div>
-<svg id="mascot-envelope" viewBox="0 0 32 24" aria-hidden="true"><path d="M2 4h28v17H2z" fill="var(--fg)" stroke="var(--line-strong)" stroke-width="1.5"/><path d="m3 5 13 10L29 5" fill="none" stroke="var(--codex)" stroke-width="2" stroke-linejoin="round"/></svg>
+<svg id="mascot-envelope" viewBox="0 0 32 24" aria-hidden="true"><path d="M2 4h28v17H2z" fill="var(--fg)" stroke="var(--rule-strong)" stroke-width="1.5"/><path d="m3 5 13 10L29 5" fill="none" stroke="var(--codex)" stroke-width="2" stroke-linejoin="round"/></svg>

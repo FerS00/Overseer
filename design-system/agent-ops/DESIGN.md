@@ -1,6 +1,7 @@
 # Overseer — DESIGN.md
 
-> Fuente de verdad del diseño. Estado: **Revisión 4 aprobada (2026-10-03)**.
+> Fuente de verdad del diseño. Estado: **Revisión 6 aprobada (2026-10-18) e implementada en Angular y WPF; auditada por Antigravity: APROBADO**.
+> Prototipo de la revisión 6: `design-system/agent-ops/prototype-v6.html`.
 > Prototipo vigente: `design-system/agent-ops/prototype-v4.html`, versión 4c (Artifact privado `https://claude.ai/artifact/MqEJR3jWMfLHXpTPUSnWmh`).
 > Histórico: `design-system/agent-ops/prototype.html` (revisión 3).
 > La sección «Revisión 4» al final de este documento manda sobre las anteriores: mascotas, tokens de agente, escenario y reglas de marca.
@@ -322,3 +323,108 @@ Petición del usuario: una vista compacta de escritorio anclada arriba que muest
 | «Ver eventos» | Lista bajo el flyout | Lista bajo el flyout y botón «Abrir en la línea de tiempo» | Da acceso a filtros y detalle sin guardar el cambio de vista. |
 | Esperando subagentes | Solo con Task/Agent | También en «pensando» con subagentes activos | Claude Code sigue pensando mientras los subagentes trabajan. |
 | Herramientas de Antigravity y DeepSeek | — | `view_file`, `list_dir`, `grep_search`, `replace_file_content`… pasan a leyendo/editando | Antes caían en «ejecutando». |
+
+---
+
+## Revisión 6 (aprobada e implementada, 2026-10-18)
+
+Petición del usuario: el diseño «no está mal, pero se siente genérico de IA»; mejorar la web y la barra de escritorio. Respuestas del usuario: dirección **Consola de instrumentos**, cambiar piel y jerarquía conservando funciones, prototipo antes de implementar y solo modo oscuro.
+
+Prototipo: `prototype-v6.html` (vistas Web, Barra de escritorio y Qué cambia; datos de ejemplo marcados). Capturas: `output/design-v6/`.
+
+### Ancla de propósito
+
+| Campo | Valor |
+|---|---|
+| Oferta | Monitor local de solo lectura para agentes de código (Claude Code, Codex, Antigravity, DeepSeek Harness) |
+| Tipo | `software` |
+| Usuario y comprador | El mismo desarrollador que trabaja con varios agentes a la vez |
+| Trabajo principal | Saber de un vistazo cuál me necesita (permiso o error) y qué hace exactamente cada uno |
+| Acción principal | Detectar el agente que pide atención y abrir su tarea exacta |
+| En 5 segundos | «Mis agentes, en qué están ahora y cuál me espera» |
+| Categoría vecina | Plantilla genérica de panel SaaS/IA; herramientas de observabilidad de servidores |
+
+### Diagnóstico de lo genérico (revisión 5)
+
+1. Paleta por defecto de producto de IA: azul-negro `#0A0D14`, halo radial y lavanda `#A99BFF` como marca.
+2. Cuatro niveles de cajas redondeadas: cabina › escenario › «Ahora» › mosaicos de métricas.
+3. Rótulos mono en mayúsculas sobre cada bloque.
+4. Mosaicos KPI («Herramientas 2 · Eventos 5») que no ayudan a decidir.
+5. Un permiso pendiente solo cambia el punto de una píldora.
+6. Registro de 76 px por fila con píldoras de tipo.
+7. Barra de escritorio en píldora flotante con desenfoque y sombra difusa.
+8. Las ligaduras de JetBrains Mono convierten `--` en un guion largo dentro de los comandos (`npm test -- carrito`). Es un error de legibilidad, no solo de estilo.
+
+### Principios nuevos
+
+1. **El color es información.** Sin color de marca. Solo tienen color las mascotas, el acento de cada agente (un filete de 3 px y su nombre) y lo que exige atención: ámbar para permiso y rojo para error.
+2. **Una superficie por zona.** Las divisiones son filetes de 1 px, no tarjetas. Radios de 4 px (6 px en paneles flotantes de escritorio).
+3. **Mono para datos, sans para lenguaje.** Rutas, comandos, horas, estados y controles en mono; títulos, tareas y texto en sans. Títulos en minúscula de frase, sin rótulos superiores.
+4. **Lo que te necesita va primero.** Una franja «te necesita» aparece sobre las cabinas solo si hay permisos o errores, con el comando exacto y «ver tarea». La fila del agente también se tiñe.
+5. **Densidad de instrumento.** Una línea de medidas por agente y un registro tipo log a 40 px por fila.
+
+### Tokens
+
+| Token | Valor | Rol | Contraste (bg / panel) |
+|---|---|---|---|
+| `--bg` | `#0D0D0C` | Fondo (carbón cálido, sin halo) | — |
+| `--panel` | `#141413` | Superficie de cabinas, filtros y flyout | — |
+| `--raise` | `#1B1B19` | Hover y elemento abierto | — |
+| `--well` | `#0A0A09` | Escenario de mascota, registro y comando | — |
+| `--rule` | `#262623` | Filetes decorativos | ~1,5 (decorativo) |
+| `--rule-strong` | `#6A675F` | Bordes de controles | 3,44 / 3,26 (UI) |
+| `--fg` | `#ECE8DF` | Texto principal; también foco y botón primario | 15,90 / 15,08 |
+| `--muted` | `#A29E94` | Texto secundario | 7,27 / 6,89 |
+| `--dim` | `#858178` | Etiquetas y metadatos (no sobre `--raise`: 4,44) | 5,01 / 4,75 |
+| `--warn` | `#F2B53A` | Permiso | 10,60 / 10,05 |
+| `--bad` | `#FF6E5A` | Error | 7,06 / 6,70 |
+| `--ok` | `#8FD48A` | Activo, terminó y conexión | 11,07 / 10,49 |
+| Acentos de agente | Sin cambios: `#E5774A`, `#8FA2FF`, `#F28BC8`, `#5CC8F5` | Filete y nombre | ≥ 6,21 sobre panel |
+
+Se retiran `--brand`, `--on-brand`, `--bg-glow`, `--surface`, `--surface-2`, `--stage` y `--line`. Se retira Bricolage Grotesque. En WPF: Segoe UI Variable Text y Cascadia Mono.
+
+### Componentes
+
+| Componente | Revisión 6 |
+|---|---|
+| Cabecera | Una línea de 64 px: Michi a 36 px, `overseer` en mono, «monitor local · solo lectura», reloj en vivo y un grupo segmentado de controles con su atajo (`pausa P`, `calma C`, `vista V`, `?`). |
+| Franja «te necesita» | Borde ámbar (rojo si solo hay errores), fondo al 7 %, una fila por agente: luz, `PIDE PERMISO`/`ERROR`, agente, comando o motivo, antigüedad y «ver tarea». `aria-live="polite"`. Desaparece sin permisos ni errores. |
+| Cabina (fila de agente) | Filete de 3 px del agente; escenario cuadrado con retícula de 18 px; nombre, mascota y estado en una línea; tarea en sans y `herramienta › objetivo` en mono; línea de medidas (en estado, sesión, modelo, herramientas). Permiso y error tiñen la fila. Dos columnas desde 1 100 px. |
+| Registro | Filtros en una barra segmentada (agentes con muestra de color, sesión, tipo y búsqueda con `/`); filas de 40 px con hora, agente, tipo en texto y mensaje + detalle. |
+| Línea de estado | Pie con dirección local, agentes y sesiones activas, y «solo lectura · nada sale de este equipo». |
+| Barra de escritorio | Pestaña opaca colgada del borde superior (radio inferior 8 px), divisiones de 1 px entre ranuras y una barra de progreso de 2 px bajo cada mascota en lugar del anillo. Permiso: ranura teñida y etiqueta ámbar. |
+| Flyout | Secciones separadas por filetes: cabecera, «ahora» con el comando en un pozo y `COPIAR`, tres medidas en columnas, tres últimos eventos y acciones (`cerrar`, `ver en la web` en papel sobre carbón). |
+
+### Comprobaciones del prototipo (2026-10-18)
+
+- Prueba de los 5 segundos a 1440 y 390 px: «Esto es un monitor de mis agentes de código que me dice que Codex pide permiso». Aprobada.
+- Primera tarea: «ver tarea» desde la franja, una interacción. Aprobada.
+- Superficies: todas son interfaz (oferta); sin fotografía ni decoración salvo la retícula del escenario.
+- Chrome real con Playwright a 1440 y 390 px: sin desbordamiento horizontal y sin errores de página.
+- Implementación en Angular y WPF: aprobada por el usuario el 2026-10-18 e implementada (ver abajo).
+
+### Implementación (2026-10-18)
+
+Claude especificó, Codex implementó (Angular y WPF en paralelo, más cuatro rondas de corrección en Angular) y Claude verificó fuera del sandbox.
+
+| Comprobación | Resultado |
+|---|---|
+| `ng build` | Correcto |
+| Vitest | 113/113 |
+| Playwright (incluye axe, desbordamiento a 375/768/1280 px y fidelidad de mascotas con `prototype-v4.html`) | 25/25 |
+| `dotnet build -c Release` | 0 advertencias, 0 errores |
+| `dotnet test` (Core.Tests) | 72/72, con salida en una carpeta temporal: el `bin/` del repositorio quedó con permisos restringidos por el sandbox de Codex y `testhost` aborta con «Access is denied» |
+| Capturas | `docs/images/*` regeneradas con `npm run screenshots`; barra WPF en `--demo` en `output/design-v6/wpf-bar.png` y `wpf-flyout.png` |
+| Auditoría de Antigravity (alcance completo, 2026-10-18) | Bloqueada en tres intentos: la CLI cortó la sesión a los 4 min sin veredicto, o no hizo ninguna llamada |
+| Auditoría de Antigravity por separado (2026-10-19) | WPF: APROBADO, con un hallazgo medio (zona de trabajo solo del monitor principal) y uno leve (`MeterFraction` con hora futura). Angular: APROBADO, con uno leve (umbral de 759 frente a 760 px). Codex los corrigió y la segunda revisión dio APROBADO en ambos, sin hallazgos |
+| Playwright tras las correcciones | 25/25 en serie (`--workers=1`). En paralelo hubo esperas agotadas intermitentes por carga del equipo, que no se reproducen en serie |
+
+### Desviaciones de la implementación
+
+| Punto | Prototipo / especificación | Implementación | Motivo |
+|---|---|---|---|
+| Registro en móvil | Fila de 40 px | 56 px por debajo de 760 px (dos líneas), con la misma altura en la virtualización | Hora y agente en una línea y el mensaje en otra |
+| Menú de cabina en disposición fila | Desplegable absoluto | `position: fixed` calculado desde el botón ⋯, acotado al viewport; se cierra al desplazarse | El contenedor con scroll horizontal recortaba el menú |
+| Cabecera de 761 a 859 px | Texto y atajo | Solo atajo o icono | La barra de controles desbordaba a 768 px |
+| Barra WPF | Pestaña fija | Pestaña si toca el borde superior (con imán a 12 px); suelta, borde completo y radio de 8 px | La barra se puede arrastrar a cualquier posición |
+| Colores de mascotas en `MascotPainter` (WPF Core) | — | Sin cambios (`#FBBF24`, `#F87171`) | Las mascotas no cambian en esta revisión |

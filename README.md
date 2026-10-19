@@ -53,7 +53,7 @@ Hondo is the blue character for DeepSeek Harness. Each agent mascot shows idle, 
 ### Dock view
 ![Dock with four agents](docs/images/dock-v5.png)
 
-Switch to the dock from **Ajustes de vista**. Each slot shows the mascot inside a ring that fills once per minute in the same state, a sub-state badge and a short label, so the state never depends on the mascot alone. Arrow keys move between slots.
+Switch to the dock from **Ajustes de vista**. Each slot shows the mascot, a thin progress bar that fills once per minute in the same state (amber for a permission request, red for an error), a sub-state badge and a short label, so the state never depends on the mascot alone. Arrow keys move between slots.
 
 ![Agent flyout](docs/images/dock-flyout-v5.png)
 

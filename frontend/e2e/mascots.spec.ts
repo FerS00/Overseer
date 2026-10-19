@@ -121,7 +121,11 @@ test('mascots follow the pointer, look at their neighbour after inactivity and r
         timing: animation.effect?.getTiming(), frames: (animation.effect as KeyframeEffect).getKeyframes(),
       }));
     }, { once: true }));
-    await svg.click({ position: { x: 60, y: 60 } });
+    const box = await svg.boundingBox();
+    const position = kind === 'michi' || box!.width < 120 || box!.height < 120
+      ? { x: box!.width / 2, y: box!.height / 2 }
+      : { x: 60, y: 60 };
+    await svg.click({ position });
     const reaction = await svg.evaluate((element) => (element as SVGElement & { __clickReaction: Array<{ target: string | null; timing?: EffectTiming; frames: ComputedKeyframe[] }> }).__clickReaction);
     expect(reaction).toHaveLength(1);
     expect(reaction[0].timing?.duration).toBe(kind === 'michi' ? 360 : 400);
@@ -212,7 +216,7 @@ test('desktop flow filters by cabin session, opens and closes details, and suppo
   await mockApi(page, events);
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Overseer' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Línea de tiempo' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Registro' })).toBeVisible();
   await page.getByRole('button', { name: /Filtrar por sesión proyecto-uno/ }).click();
   await expect(page.locator('.timeline-row')).toHaveCount(1);
   await page.locator('.timeline-row').click();
@@ -232,7 +236,7 @@ test('desktop flow filters by cabin session, opens and closes details, and suppo
   await page.keyboard.press('2');
   await expect(page.getByRole('group', { name: 'Filtrar por agente' }).getByRole('button', { name: 'Codex', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.press('0');
-  await expect(page.getByRole('button', { name: 'Todos', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'todos', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.press('p');
   await expect(page.getByRole('button', { name: 'Reanudar línea de tiempo' })).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.press('c');
@@ -388,7 +392,7 @@ async function expectOpaqueDetailPanel(page: Page): Promise<void> {
     const style = getComputedStyle(element);
     return { background: style.backgroundColor, opacity: style.opacity, foreground: style.color };
   });
-  expect(panel.background).toBe('rgb(17, 21, 31)');
+  expect(panel.background).toBe('rgb(20, 20, 19)');
   expect(panel.opacity).toBe('1');
   expect(contrastRatio(panel.foreground, panel.background)).toBeGreaterThanOrEqual(4.5);
 }
@@ -424,14 +428,14 @@ test('3000 events render a bounded virtual window while scrolling', async ({ pag
   await mockApi(page, many);
   await page.goto('/');
   await expect.poll(() => page.locator('.timeline-row').count()).toBeGreaterThan(0);
-  await expect(page.locator('.timeline-row')).toHaveCount(15);
+  await expect(page.locator('.timeline-row')).toHaveCount(20);
   const elapsed = await page.evaluate(() => {
     const scroller = document.querySelector<HTMLElement>('.event-viewport')!;
     const start = performance.now(); scroller.scrollTop = scroller.scrollHeight - scroller.clientHeight; scroller.dispatchEvent(new Event('scroll'));
     return performance.now() - start;
   });
   expect(elapsed).toBeLessThan(500);
-  await expect.poll(() => page.locator('.timeline-row').count()).toBeLessThanOrEqual(24);
+  await expect.poll(() => page.locator('.timeline-row').count()).toBeLessThanOrEqual(28);
 });
 
 test('calm mode and reduced motion keep mascot animations finite', async ({ page }) => {

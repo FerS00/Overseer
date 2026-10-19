@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using Overseer.Desktop.Rendering;
 
@@ -17,6 +18,7 @@ namespace Overseer.Desktop;
 /// </summary>
 public partial class MainWindow : Window
 {
+    private const uint MonitorDefaultToNearest = 2;
     private const double MinWindowWidth = 388;
     private const double MaxFlyoutHeight = 400;
     private const double OuterMargin = 24;
@@ -48,6 +50,7 @@ public partial class MainWindow : Window
             && t >= SystemParameters.VirtualScreenTop && t <= SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight - 60;
         Left = onScreen ? left!.Value : area.Left + (area.Width - Width) / 2;
         Top = onScreen ? top!.Value : area.Top;
+        ApplyDockEdge();
     }
 
     /// <summary>Shows the bar and moves keyboard focus to the first mascot, for the global shortcut.</summary>
@@ -85,7 +88,60 @@ public partial class MainWindow : Window
         if (e.ChangedButton != MouseButton.Left || e.ButtonState != MouseButtonState.Pressed) return;
         var before = (Left, Top);
         DragMove();
+        var workAreaTop = CurrentWorkAreaTop();
+        if (Top >= workAreaTop - 12 && Top <= workAreaTop + 12) Top = workAreaTop;
+        ApplyDockEdge();
         if (before != (Left, Top)) Moved?.Invoke(Left, Top);
+    }
+
+    private void ApplyDockEdge()
+    {
+        var docked = Math.Abs(Top - CurrentWorkAreaTop()) <= 2;
+        Root.Margin = new Thickness(12, docked ? 0 : 8, 12, 16);
+        Bar.BorderThickness = docked ? new Thickness(1, 0, 1, 1) : new Thickness(1);
+        Bar.CornerRadius = docked ? new CornerRadius(0, 0, 8, 8) : new CornerRadius(8);
+    }
+
+    private double CurrentWorkAreaTop()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) return SystemParameters.WorkArea.Top;
+
+        var monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+        if (monitor == IntPtr.Zero) return SystemParameters.WorkArea.Top;
+
+        var info = new MonitorInfo { Size = (uint)Marshal.SizeOf<MonitorInfo>() };
+        if (!GetMonitorInfo(monitor, ref info)) return SystemParameters.WorkArea.Top;
+
+        if (PresentationSource.FromVisual(this)?.CompositionTarget is { } target)
+            return target.TransformFromDevice.Transform(new Point(0, info.Work.Top)).Y;
+
+        var dpi = VisualTreeHelper.GetDpi(this);
+        return dpi.DpiScaleY > 0 ? info.Work.Top / dpi.DpiScaleY : SystemParameters.WorkArea.Top;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct MonitorInfo
+    {
+        public uint Size;
+        public NativeRect Monitor;
+        public NativeRect Work;
+        public uint Flags;
     }
 
     private void OnSlotClick(object sender, RoutedEventArgs e)
@@ -161,7 +217,7 @@ public partial class MainWindow : Window
         copyReset.Start();
     }
 
-    private void ResetCopyButton() { copyReset.Stop(); CopyButton.Content = "Copiar"; }
+    private void ResetCopyButton() { copyReset.Stop(); CopyButton.Content = "COPIAR"; }
 
     /// <summary>Builds the right-click menu each time so it reflects the current agents and options.</summary>
     private void OnBarMenuOpening(object sender, ContextMenuEventArgs e)

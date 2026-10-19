@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:r="clr-namespace:Overseer.Desktop.Rendering"
+        xmlns:core="clr-namespace:Overseer.Desktop.Core;assembly=Overseer.Desktop.Core"
         Title="Overseer" Icon="Assets/michi.ico"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
         Topmost="True" ShowInTaskbar="False" ShowActivated="False"
@@ -11,21 +12,27 @@
   <Window.Resources>
     <Style x:Key="SlotButton" TargetType="Button">
       <Setter Property="Foreground" Value="{StaticResource Fg}" />
+      <Setter Property="Width" Value="66" />
+      <Setter Property="Padding" Value="4,6,4,9" />
       <Setter Property="Cursor" Value="Hand" />
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
-            <Border x:Name="Bd" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="14" Padding="2,4,2,3" Margin="2,0" RenderTransformOrigin=".5,.5">
-              <ContentPresenter />
+            <Border x:Name="Bd" Background="Transparent" BorderBrush="{StaticResource Rule}" BorderThickness="1,0,0,0" CornerRadius="0" Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Center" />
             </Border>
             <ControlTemplate.Triggers>
-              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Background" Value="{StaticResource Surface2}" /></Trigger>
-              <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Ring}" /></Trigger>
-              <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Surface2}" />
-                <Setter TargetName="Bd" Property="BorderBrush" Value="{Binding Accent}" />
-                <Setter TargetName="Bd" Property="RenderTransform"><Setter.Value><ScaleTransform ScaleX="1.06" ScaleY="1.06" /></Setter.Value></Setter>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Background" Value="{StaticResource Raise}" /></Trigger>
+              <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ContentPresenter}, Path=(ItemsControl.AlternationIndex)}" Value="0">
+                <Setter TargetName="Bd" Property="BorderThickness" Value="0" />
               </DataTrigger>
+              <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Raise}" />
+              </DataTrigger>
+              <DataTrigger Binding="{Binding State}" Value="{x:Static core:MascotState.Permission}">
+                <Setter TargetName="Bd" Property="Background" Value="{StaticResource WarnTint}" />
+              </DataTrigger>
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Ring}" /><Setter TargetName="Bd" Property="BorderThickness" Value="1" /></Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
         </Setter.Value>
@@ -33,15 +40,15 @@
     </Style>
     <Style x:Key="FlyoutButton" TargetType="Button">
       <Setter Property="Foreground" Value="{StaticResource Fg}" />
-      <Setter Property="Background" Value="{StaticResource Surface2}" />
-      <Setter Property="BorderBrush" Value="{StaticResource LineStrong}" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="{StaticResource RuleStrong}" />
       <Setter Property="Padding" Value="14,0" />
       <Setter Property="MinHeight" Value="36" />
       <Setter Property="Cursor" Value="Hand" />
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
-            <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="{TemplateBinding Padding}">
+            <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="4" Padding="{TemplateBinding Padding}">
               <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
             <ControlTemplate.Triggers>
@@ -61,11 +68,11 @@
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
-            <Border x:Name="Bd" Background="Transparent" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="8" Padding="8,3">
+            <Border x:Name="Bd" Background="Transparent" BorderBrush="{StaticResource RuleStrong}" BorderThickness="1" CornerRadius="4" Padding="8,3">
               <ContentPresenter VerticalAlignment="Center" />
             </Border>
             <ControlTemplate.Triggers>
-              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Background" Value="{StaticResource Surface2}" /><Setter Property="Foreground" Value="{StaticResource Fg}" /></Trigger>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Background" Value="{StaticResource Raise}" /><Setter Property="Foreground" Value="{StaticResource Fg}" /></Trigger>
               <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Ring}" /></Trigger>
               <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".4" /></Trigger>
             </ControlTemplate.Triggers>
@@ -82,23 +89,26 @@
   </Window.Resources>
 
   <!-- The margin leaves room for the bar shadow; fully transparent pixels let clicks through to the desktop. -->
-  <StackPanel Margin="12,8,12,16">
-    <Border x:Name="Bar" HorizontalAlignment="Center" CornerRadius="22" Background="#E011151F" BorderBrush="{StaticResource Line}" BorderThickness="1"
-            Padding="8,6" MouseLeftButtonDown="OnBarMouseDown" ContextMenuOpening="OnBarMenuOpening" ToolTip="Arrastra para mover la barra · clic derecho para opciones">
+  <StackPanel x:Name="Root" Margin="12,8,12,16">
+    <Border x:Name="Bar" HorizontalAlignment="Center" CornerRadius="8" Background="#121211" BorderBrush="#2E2E2A" BorderThickness="1"
+            Padding="0" MouseLeftButtonDown="OnBarMouseDown" ContextMenuOpening="OnBarMenuOpening" ToolTip="Arrastra para mover la barra · clic derecho para opciones">
       <Border.ContextMenu><ContextMenu /></Border.ContextMenu>
-      <Border.Effect><DropShadowEffect BlurRadius="18" ShadowDepth="4" Opacity=".45" Color="Black" /></Border.Effect>
+      <Border.Effect><DropShadowEffect BlurRadius="18" ShadowDepth="6" Opacity=".45" Color="Black" /></Border.Effect>
       <StackPanel Orientation="Horizontal">
-        <ItemsControl x:Name="SlotList" ItemsSource="{Binding Slots}" Focusable="False" KeyboardNavigation.DirectionalNavigation="Cycle">
+        <ItemsControl x:Name="SlotList" ItemsSource="{Binding Slots}" AlternationCount="64" Focusable="False" KeyboardNavigation.DirectionalNavigation="Cycle">
           <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate>
               <Button Style="{StaticResource SlotButton}" Click="OnSlotClick" ToolTip="{Binding Name}" AutomationProperties.Name="{Binding AutomationName}">
-                <StackPanel Width="58">
-                  <r:MascotView Kind="{Binding Kind}" State="{Binding State}" Width="44" Height="44" HorizontalAlignment="Center" />
-                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,2,0,0">
-                    <Ellipse Width="6" Height="6" Fill="{Binding StateBrush}" VerticalAlignment="Center" Margin="0,0,4,0" />
-                    <TextBlock Text="{Binding ShortLabel}" Style="{StaticResource Caption}" FontSize="9" />
-                  </StackPanel>
+                <StackPanel>
+                  <r:MascotView Kind="{Binding Kind}" State="{Binding State}" Width="40" Height="40" HorizontalAlignment="Center" />
+                  <TextBlock Text="{Binding ShortLabel}" Style="{StaticResource Caption}" FontSize="9" Foreground="{Binding StateBrush}" HorizontalAlignment="Center" />
+                  <Grid Height="2" Margin="8,4,8,0" ClipToBounds="True">
+                    <Rectangle Fill="{StaticResource Rule}" />
+                    <Rectangle Fill="{Binding MeterBrush}" HorizontalAlignment="Stretch" RenderTransformOrigin="0,0.5">
+                      <Rectangle.RenderTransform><ScaleTransform ScaleX="{Binding MeterFraction}" /></Rectangle.RenderTransform>
+                    </Rectangle>
+                  </Grid>
                 </StackPanel>
               </Button>
             </DataTemplate>
@@ -106,66 +116,82 @@
         </ItemsControl>
         <TextBlock Text="Sin mascotas · clic derecho para elegir" Foreground="{StaticResource Muted}" FontSize="12" VerticalAlignment="Center" Margin="10,14"
                    Visibility="{Binding IsEmpty, Converter={StaticResource Visible}}" />
-        <Rectangle Width="1" Fill="{StaticResource Line}" Margin="6,8" />
-        <Ellipse Width="8" Height="8" Fill="{Binding StatusBrush}" VerticalAlignment="Center" Margin="4,0,6,0" ToolTip="{Binding StatusText}" />
+        <Border BorderBrush="{StaticResource Rule}" BorderThickness="1,0,0,0" Margin="12,0,0,0" Padding="12,0,12,0" ToolTip="{Binding StatusText}">
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <Rectangle Width="7" Height="7" Fill="{Binding StatusBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <TextBlock Text="{Binding StatusShort}" FontFamily="{StaticResource Mono}" FontSize="11" Foreground="{StaticResource Dim}" />
+          </StackPanel>
+        </Border>
       </StackPanel>
     </Border>
 
     <!-- Height is animated from 0 so the panel unfolds downwards from the bar. -->
     <Border x:Name="FlyoutHost" Height="0" ClipToBounds="True" Visibility="Collapsed">
       <!-- MinWidth/MaxWidth keep long paths from widening the panel; MaxHeight is also capped to the screen in code. -->
-      <Border x:Name="Flyout" DataContext="{Binding Selected}" Margin="0,10,0,0" MinWidth="340" MaxWidth="520" MaxHeight="400" VerticalAlignment="Top" HorizontalAlignment="Center"
-              CornerRadius="18" Background="{StaticResource Surface}" BorderBrush="{StaticResource LineStrong}" BorderThickness="1" Padding="16,16,8,16">
+      <Border x:Name="Flyout" DataContext="{Binding Selected}" Margin="0,8,0,0" MinWidth="340" MaxWidth="520" MaxHeight="400" VerticalAlignment="Top" HorizontalAlignment="Center"
+              CornerRadius="6" Background="{StaticResource Panel}" BorderBrush="#3A3A35" BorderThickness="1" Padding="0">
+        <Border.Effect><DropShadowEffect BlurRadius="28" ShadowDepth="10" Opacity=".5" Color="Black" /></Border.Effect>
         <Border.RenderTransform><TranslateTransform x:Name="FlyoutOffset" /></Border.RenderTransform>
         <DockPanel LastChildFill="True">
-          <DockPanel DockPanel.Dock="Top" LastChildFill="True" Margin="0,0,8,0">
-            <Border DockPanel.Dock="Right" VerticalAlignment="Top" Background="{StaticResource Surface2}" CornerRadius="12" Padding="10,4" Margin="8,0,0,0">
-              <StackPanel Orientation="Horizontal">
-                <Ellipse Width="8" Height="8" Fill="{Binding StateBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
-                <TextBlock Text="{Binding StateLabel}" FontFamily="{StaticResource Mono}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource Muted}" />
+          <Border DockPanel.Dock="Top" BorderBrush="{StaticResource Rule}" BorderThickness="0,0,0,1" Padding="14,12">
+            <DockPanel LastChildFill="True">
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top" Margin="12,2,0,0">
+                <Rectangle Width="7" Height="7" Fill="{Binding StateBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <TextBlock Text="{Binding StateLabel}" FontFamily="{StaticResource Mono}" FontSize="11" FontWeight="SemiBold" Foreground="{Binding StateBrush}" />
               </StackPanel>
-            </Border>
-            <StackPanel>
-              <TextBlock Text="{Binding Name}" Foreground="{Binding Accent}" FontSize="17" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
-              <TextBlock FontFamily="{StaticResource Mono}" FontSize="11" Foreground="{StaticResource Muted}" TextTrimming="CharacterEllipsis">
-                <Run Text="{Binding MascotName, Mode=OneWay}" /><Run Text=" · sesión " /><Run Text="{Binding Session, Mode=OneWay}" />
-              </TextBlock>
-            </StackPanel>
-          </DockPanel>
+              <StackPanel>
+                <TextBlock Text="{Binding Name}" Foreground="{Binding Accent}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                <TextBlock FontFamily="{StaticResource Mono}" FontSize="11" Foreground="{StaticResource Dim}" TextTrimming="CharacterEllipsis">
+                  <Run Text="{Binding MascotName, Mode=OneWay}" /><Run Text=" · sesión " /><Run Text="{Binding Session, Mode=OneWay}" />
+                </TextBlock>
+              </StackPanel>
+            </DockPanel>
+          </Border>
 
-          <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,8,0">
-            <Button Style="{StaticResource FlyoutButton}" Background="{StaticResource Brand}" BorderBrush="{StaticResource Brand}" Foreground="{StaticResource OnBrand}"
-                    FontWeight="SemiBold" Content="Ver en la web" Click="OnOpenWeb" Margin="0,0,8,0" />
-            <Button Style="{StaticResource FlyoutButton}" Content="Cerrar" Click="OnCloseFlyout" />
-          </StackPanel>
+          <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource Rule}" BorderThickness="0,1,0,0" Padding="14,12">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+              <Button Style="{StaticResource FlyoutButton}" Content="Cerrar" Click="OnCloseFlyout" Margin="0,0,8,0" />
+              <Button Style="{StaticResource FlyoutButton}" Background="{StaticResource Fg}" BorderBrush="{StaticResource Fg}" Foreground="{StaticResource Bg}"
+                      FontWeight="SemiBold" Content="Ver en la web" Click="OnOpenWeb" />
+            </StackPanel>
+          </Border>
 
           <!-- Only the task details scroll; the header and the buttons stay in place. -->
-          <ScrollViewer x:Name="FlyoutScroll" Margin="0,12,0,0" Padding="0,0,8,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+          <ScrollViewer x:Name="FlyoutScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
             <ScrollViewer.Resources><Style TargetType="ScrollBar" BasedOn="{StaticResource ThinScrollBar}" /></ScrollViewer.Resources>
             <StackPanel>
-              <Border Background="{StaticResource Stage}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="12" Padding="12">
+              <Border BorderBrush="{StaticResource Rule}" BorderThickness="0,0,0,1" Padding="14,12">
                 <StackPanel>
                   <DockPanel LastChildFill="True">
-                    <Button x:Name="CopyButton" DockPanel.Dock="Right" VerticalAlignment="Top" Style="{StaticResource GhostButton}" Content="Copiar" Click="OnCopy"
-                            IsEnabled="{Binding CanCopy}" ToolTip="Copiar la tarea, el comando o la ruta" AutomationProperties.Name="Copiar la tarea al portapapeles" Margin="8,0,0,0" />
-                    <TextBlock Text="{Binding ActivityLabel}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <WrapPanel Orientation="Horizontal">
+                      <TextBlock Text="{Binding ActivityLabel}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" />
+                      <TextBlock Text="{Binding Tool}" FontFamily="{StaticResource Mono}" FontSize="11" Foreground="{StaticResource Dim}" Margin="10,2,0,0" TextWrapping="Wrap"
+                                 Visibility="{Binding HasTool, Converter={StaticResource Visible}}" />
+                    </WrapPanel>
                   </DockPanel>
-                  <TextBlock Text="{Binding Tool}" FontFamily="{StaticResource Mono}" FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap"
-                             Visibility="{Binding HasTool, Converter={StaticResource Visible}}" />
-                  <TextBlock Text="{Binding TargetKind}" Style="{StaticResource Caption}" Margin="0,8,0,2" />
-                  <TextBlock Text="{Binding TargetText}" FontFamily="{StaticResource Mono}" FontSize="12" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding TargetKind}" FontFamily="{StaticResource Mono}" FontSize="10" Foreground="{StaticResource Dim}" Margin="0,8,0,2" />
+                  <Border Background="{StaticResource Well}" BorderBrush="{StaticResource Rule}" BorderThickness="1" CornerRadius="4" Padding="12,10">
+                    <DockPanel LastChildFill="True">
+                      <Button x:Name="CopyButton" DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Content="COPIAR" Click="OnCopy" IsEnabled="{Binding CanCopy}"
+                              ToolTip="Copiar la tarea, el comando o la ruta" AutomationProperties.Name="Copiar la tarea al portapapeles" Margin="10,0,0,0" />
+                      <TextBlock Text="{Binding TargetText}" FontFamily="{StaticResource Mono}" FontSize="12" TextWrapping="Wrap" />
+                    </DockPanel>
+                  </Border>
                 </StackPanel>
               </Border>
 
-              <UniformGrid Columns="2" Margin="0,12,0,0">
-                <StackPanel><TextBlock Text="EN ESTE ESTADO" Style="{StaticResource Caption}" /><TextBlock Text="{Binding SinceText}" FontFamily="{StaticResource Mono}" FontSize="13" FontWeight="SemiBold" /></StackPanel>
-                <StackPanel><TextBlock Text="ÚLTIMO EVENTO" Style="{StaticResource Caption}" /><TextBlock Text="{Binding LastText}" FontFamily="{StaticResource Mono}" FontSize="13" FontWeight="SemiBold" /></StackPanel>
-              </UniformGrid>
+              <Grid Margin="0" MinHeight="58">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <StackPanel Margin="14,10,14,10"><TextBlock Text="en estado" FontFamily="{StaticResource Mono}" FontSize="11" Foreground="{StaticResource Dim}" /><TextBlock Text="{Binding SinceText}" FontFamily="{StaticResource Mono}" FontSize="14" FontWeight="SemiBold" /></StackPanel>
+                <Border Grid.Column="1" BorderBrush="{StaticResource Rule}" BorderThickness="1,0,0,0" Padding="14,10"><StackPanel><TextBlock Text="último evento" FontFamily="{StaticResource Mono}" FontSize="11" Foreground="{StaticResource Dim}" /><TextBlock Text="{Binding LastText}" FontFamily="{StaticResource Mono}" FontSize="14" FontWeight="SemiBold" /></StackPanel></Border>
+              </Grid>
 
-              <StackPanel Margin="0,12,0,0" Visibility="{Binding HasFullDetail, Converter={StaticResource Visible}}">
-                <TextBlock Text="DETALLE COMPLETO" Style="{StaticResource Caption}" Margin="0,0,0,4" />
-                <TextBlock Text="{Binding FullDetail}" FontFamily="{StaticResource Mono}" FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap" />
-              </StackPanel>
+              <Border BorderBrush="{StaticResource Rule}" BorderThickness="0,1,0,0" Padding="14,12" Visibility="{Binding HasFullDetail, Converter={StaticResource Visible}}">
+                <StackPanel>
+                  <TextBlock Text="detalle completo" FontFamily="{StaticResource Mono}" FontSize="11" Foreground="{StaticResource Dim}" Margin="0,0,0,4" />
+                  <TextBlock Text="{Binding FullDetail}" FontFamily="{StaticResource Mono}" FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
             </StackPanel>
           </ScrollViewer>
         </DockPanel>

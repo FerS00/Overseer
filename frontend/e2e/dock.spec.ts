@@ -118,11 +118,11 @@ test('permission and error slots show the warning ring and are announced', async
   await send(page, { uid: 'perm', agent: 'codex', session_id: 'codex-s1', type: 'permission_request', title: 'Solicita permiso: exec', ts: new Date().toISOString() });
   await expect(page.locator('#dock-slot-codex')).toHaveAttribute('data-state', 'permission');
   await expect(page.locator('#dock-slot-codex .slot-label')).toHaveText('PERMISO');
-  await expect(page.locator('#dock-slot-codex .tring .track')).toHaveCSS('stroke', 'rgb(251, 191, 36)');
+  await expect(page.locator('#dock-slot-codex .meter b')).toHaveCSS('background-color', 'rgb(242, 181, 58)');
   await expect(page.locator('[aria-live="polite"]').filter({ hasText: 'Codex: pide permiso' })).toHaveCount(1);
   await send(page, { uid: 'err', agent: 'claude', session_id: 'claude-s1', type: 'error', title: 'Fallo', ts: new Date().toISOString() });
   await expect(page.locator('#dock-slot-claude')).toHaveAttribute('data-state', 'error');
-  await expect(page.locator('#dock-slot-claude .tring .track')).toHaveCSS('stroke', 'rgb(248, 113, 113)');
+  await expect(page.locator('#dock-slot-claude .meter b')).toHaveCSS('background-color', 'rgb(255, 110, 90)');
 });
 
 test('flyout opens per slot, updates live, stays in the viewport and closes without moving the dock', async ({ page }) => {

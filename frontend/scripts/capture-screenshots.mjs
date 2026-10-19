@@ -93,7 +93,7 @@ async function openView(browser, { width = 1440, height = 900, data = events, qu
   await installMocks(page, data);
   await page.goto(`${baseURL}/${query}`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { name: 'Overseer' }).waitFor();
-  await expect(page.locator('.connection')).toHaveText('En vivo');
+  await expect(page.locator('.connection')).toContainText('En vivo');
   if (data.length) await page.locator('.timeline-row').first().waitFor();
   await page.waitForTimeout(180);
   return page;

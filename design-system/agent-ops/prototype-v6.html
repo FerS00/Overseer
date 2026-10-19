@@ -1,0 +1,836 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overseer · revisión 6</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Revisión 6 · «Consola de instrumentos».
+   Una sola superficie por zona, separada por filetes de 1 px; nada de tarjetas dentro de tarjetas.
+   El color pertenece a las mascotas y a lo que exige atención (ámbar permiso, rojo error). */
+:root {
+  color-scheme: dark;
+  --bg: #0D0D0C;
+  --panel: #141413;
+  --raise: #1B1B19;
+  --well: #0A0A09;
+  --rule: #262623;
+  --rule-strong: #6A675F;
+  --fg: #ECE8DF;
+  --muted: #A29E94;
+  --dim: #858178;
+  --ring: #ECE8DF;
+  --warn: #F2B53A;
+  --warn-tint: rgba(242, 181, 58, .07);
+  --bad: #FF6E5A;
+  --bad-tint: rgba(255, 110, 90, .07);
+  --ok: #8FD48A;
+  --claude: #E5774A;
+  --codex: #8FA2FF;
+  --antigravity: #F28BC8;
+  --deepseek: #5CC8F5;
+  --sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', 'Cascadia Mono', Consolas, monospace;
+  --r: 4px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); }
+body { font: 400 14px/1.45 var(--sans); min-width: 320px; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.mono, code, kbd, time { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+/* Sin ligaduras: «--», «->» o «!=» deben verse tal cual en comandos y rutas. */
+body * { font-variant-ligatures: none; font-feature-settings: 'calt' 0, 'liga' 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- conmutador de vistas del prototipo (no es parte del producto) ---------- */
+.proto-nav { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1px dashed var(--rule-strong); color: var(--dim); font: 500 12px var(--mono); }
+.proto-nav nav { display: flex; gap: 2px; }
+.proto-nav button { min-height: 32px; padding: 0 10px; border: 1px solid transparent; border-radius: var(--r); background: none; color: var(--muted); }
+.proto-nav button[aria-pressed='true'] { border-color: var(--rule-strong); color: var(--fg); }
+.proto-nav .sample { color: var(--warn); }
+[data-view]:not(.on) { display: none !important; }
+
+/* ---------- web ---------- */
+.shell { width: min(100% - 32px, 1240px); margin-inline: auto; padding-bottom: 24px; }
+
+/* Barra superior: una línea, como la de estado de una terminal. */
+.top { display: flex; align-items: center; gap: 16px; min-height: 64px; border-bottom: 1px solid var(--rule); }
+.wordmark { display: flex; align-items: center; gap: 10px; margin-right: auto; min-width: 0; }
+.wordmark .michi { width: 36px; height: 36px; flex: none; }
+.wordmark b { font: 700 17px var(--mono); letter-spacing: -.02em; }
+.wordmark span { color: var(--dim); font: 400 12px var(--mono); white-space: nowrap; }
+.live { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font: 500 12px var(--mono); white-space: nowrap; }
+.live i { width: 7px; height: 7px; background: var(--ok); }
+.tools { display: flex; border: 1px solid var(--rule); border-radius: var(--r); }
+.tools button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border: 0; border-left: 1px solid var(--rule); background: none; color: var(--muted); font: 500 12px var(--mono); }
+.tools button:first-child { border-left: 0; }
+.tools button:hover { background: var(--raise); color: var(--fg); }
+.tools button[aria-pressed='true'] { color: var(--fg); background: var(--raise); box-shadow: inset 0 -2px var(--fg); }
+.tools kbd { color: var(--dim); font-size: 11px; }
+
+/* Aviso «te necesitan»: solo existe cuando hay permiso o error. Es lo primero que se lee. */
+.needs { display: grid; gap: 0; margin-top: 16px; border: 1px solid var(--warn); border-radius: var(--r); background: var(--warn-tint); }
+.needs[hidden] { display: none; }
+.need { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto; align-items: center; gap: 14px; min-height: 52px; padding: 6px 8px 6px 14px; }
+.need + .need { border-top: 1px solid var(--rule); }
+.need .tag { font: 700 11px var(--mono); letter-spacing: .06em; color: var(--warn); }
+.need[data-kind='error'] .tag { color: var(--bad); }
+.need .who { font: 600 13px var(--mono); }
+.need code { overflow: hidden; color: var(--fg); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.need time { color: var(--muted); font-size: 12px; }
+.need button { min-height: 40px; padding: 0 14px; border: 1px solid var(--rule-strong); border-radius: var(--r); background: var(--bg); font: 500 12px var(--mono); }
+.need button:hover { border-color: var(--fg); }
+.needs-light { width: 8px; height: 8px; background: var(--warn); animation: pulse 1.1s steps(2) infinite; }
+.need[data-kind='error'] .needs-light { background: var(--bad); animation: none; }
+
+/* Agentes: una tabla de instrumentos. Cada fila es un agente. */
+.section-head { display: flex; align-items: baseline; gap: 12px; margin: 28px 0 10px; }
+.section-head h2 { margin: 0; font: 600 15px var(--sans); }
+.section-head span { color: var(--dim); font: 400 12px var(--mono); }
+.section-head .right { margin-left: auto; }
+.agents { border: 1px solid var(--rule); border-radius: var(--r); background: var(--panel); }
+.agents[data-cols='2'] { display: grid; grid-template-columns: 1fr 1fr; }
+.agent { --c: var(--fg); position: relative; display: grid; grid-template-columns: 132px minmax(0, 1fr); min-height: 148px; border-top: 1px solid var(--rule); }
+.agents[data-cols='2'] .agent:nth-child(-n+2) { border-top: 0; }
+.agents[data-cols='2'] .agent:nth-child(even) { border-left: 1px solid var(--rule); }
+.agents:not([data-cols='2']) .agent:first-child { border-top: 0; }
+.agent::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--c); opacity: .9; }
+.agent[data-state='permission'] { background: var(--warn-tint); }
+.agent[data-state='permission']::before { background: var(--warn); }
+.agent[data-state='error'] { background: var(--bad-tint); }
+.agent[data-state='error']::before { background: var(--bad); }
+.agent[data-state='sleeping'] .readout { opacity: .62; }
+/* Escenario: retícula fina como la de un osciloscopio; la mascota es lo único con color. */
+.scope { position: relative; display: grid; place-items: center; margin: 10px 0 10px 13px; border: 1px solid var(--rule); border-radius: var(--r); background-color: var(--well);
+  background-image: linear-gradient(var(--rule) 1px, transparent 1px), linear-gradient(90deg, var(--rule) 1px, transparent 1px); background-size: 18px 18px; background-position: -1px -1px; }
+.scope svg { width: 92px; height: 92px; }
+.scope .px { width: 84px; height: 84px; }
+.readout { display: grid; grid-template-rows: auto 1fr auto; gap: 6px; min-width: 0; padding: 12px 16px 12px 16px; }
+.r-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.r-head h3 { margin: 0; color: var(--c); font: 600 15px var(--sans); white-space: nowrap; }
+.r-head .mascot-name { color: var(--dim); font: 400 12px var(--mono); }
+.r-head .ctrl { display: flex; margin-left: auto; }
+.r-head .ctrl button { display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: var(--r); background: none; color: var(--dim); font: 600 14px var(--mono); }
+.r-head .ctrl button:hover { background: var(--raise); color: var(--fg); }
+.state { display: inline-flex; align-items: center; gap: 7px; font: 600 12px var(--mono); letter-spacing: .02em; color: var(--muted); white-space: nowrap; }
+.state i { width: 7px; height: 7px; background: currentColor; }
+.state[data-s='reading'], .state[data-s='editing'], .state[data-s='running'], .state[data-s='done'] { color: var(--ok); }
+.state[data-s='thinking'] { color: var(--fg); }
+.state[data-s='permission'] { color: var(--warn); }
+.state[data-s='permission'] i { animation: pulse 1.1s steps(2) infinite; }
+.state[data-s='error'] { color: var(--bad); }
+.task { display: grid; align-content: center; gap: 3px; min-width: 0; }
+.task .what { font: 500 15px var(--sans); }
+.task code { display: block; overflow: hidden; color: var(--fg); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.task code .k { color: var(--dim); }
+.meta { display: flex; flex-wrap: wrap; gap: 4px 18px; color: var(--dim); font: 400 12px var(--mono); }
+.meta b { color: var(--muted); font-weight: 500; }
+.meta .big { color: var(--fg); }
+
+/* Registro: un log, no una lista de tarjetas. */
+.filters { display: flex; flex-wrap: wrap; align-items: stretch; border: 1px solid var(--rule); border-bottom: 0; border-radius: var(--r) var(--r) 0 0; background: var(--panel); }
+.seg { display: flex; border-right: 1px solid var(--rule); }
+.seg button { min-height: 44px; padding: 0 12px; border: 0; background: none; color: var(--muted); font: 500 12px var(--mono); }
+.seg button[aria-pressed='true'] { color: var(--fg); box-shadow: inset 0 -2px var(--fg); }
+.seg button .sw { display: inline-block; width: 6px; height: 6px; margin-right: 6px; vertical-align: 1px; }
+.filters label { display: flex; align-items: center; gap: 8px; padding: 0 12px; border-right: 1px solid var(--rule); color: var(--dim); font: 400 12px var(--mono); }
+.filters select { min-height: 32px; border: 1px solid var(--rule-strong); border-radius: var(--r); background: var(--bg); padding: 0 6px; font: 400 12px var(--mono); }
+.filters .search { flex: 1; min-width: 180px; }
+.filters .search input { width: 100%; min-height: 32px; border: 0; background: none; font: 400 13px var(--mono); }
+.filters .search input:focus-visible { outline: none; }
+.filters .search:focus-within { box-shadow: inset 0 -2px var(--fg); }
+.log { margin: 0; padding: 0; list-style: none; border: 1px solid var(--rule); border-radius: 0 0 var(--r) var(--r); background: var(--well); max-height: 420px; overflow: auto; }
+.log li { border-top: 1px solid var(--rule); }
+.log li:first-child { border-top: 0; }
+.log button { display: grid; grid-template-columns: 74px 132px 92px minmax(0, 1fr); align-items: baseline; gap: 12px; width: 100%; min-height: 40px; padding: 9px 14px; border: 0; background: none; text-align: left; font: 400 12.5px var(--mono); }
+.log button:hover { background: var(--raise); }
+.log time { color: var(--dim); }
+.log .ag { color: var(--c); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.log .ty { color: var(--muted); }
+.log .ty[data-t='permiso'] { color: var(--warn); } .log .ty[data-t='error'] { color: var(--bad); }
+.log .tx { min-width: 0; overflow: hidden; color: var(--fg); font-family: var(--sans); font-size: 13.5px; text-overflow: ellipsis; white-space: nowrap; }
+.log .tx code { margin-left: 10px; color: var(--dim); font-size: 12px; }
+.log li.new { animation: slidein .18s ease-out both; }
+
+.status-line { display: flex; flex-wrap: wrap; gap: 4px 20px; margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--rule); color: var(--dim); font: 400 12px var(--mono); }
+.status-line .right { margin-left: auto; }
+
+/* ---------- barra de escritorio (WPF) ---------- */
+.desk { position: relative; min-height: 720px; overflow: hidden; background:
+  radial-gradient(ellipse at 70% 120%, #2a2f2a 0%, transparent 60%), linear-gradient(160deg, #3b4148 0%, #23272b 55%, #1a1c1e 100%); }
+.desk .note { position: absolute; left: 16px; bottom: 16px; max-width: 420px; color: #d7d4cc; font: 400 12px var(--mono); opacity: .8; }
+.dock { position: absolute; top: 0; left: 50%; translate: -50% 0; display: flex; align-items: stretch; border: 1px solid #2E2E2A; border-top: 0; border-radius: 0 0 8px 8px; background: #121211; box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+.slot { --c: var(--fg); position: relative; display: grid; justify-items: center; gap: 2px; width: 66px; padding: 6px 4px 9px; border: 0; border-left: 1px solid var(--rule); background: none; color: var(--fg); }
+.slot:first-child { border-left: 0; }
+.slot:hover, .slot[aria-expanded='true'] { background: var(--raise); }
+.slot[aria-expanded='true']::after { content: ''; position: absolute; inset: auto 0 -1px 0; height: 1px; background: var(--raise); }
+.slot .m { display: grid; place-items: center; width: 40px; height: 40px; }
+.slot .m svg { width: 40px; height: 40px; } .slot .m .px { width: 36px; height: 36px; }
+.slot .lbl { color: var(--muted); font: 600 9px/1 var(--mono); letter-spacing: .05em; }
+/* La barra inferior sustituye al anillo: se llena en 60 s en el mismo estado. */
+.slot .meter { position: absolute; left: 8px; right: 8px; bottom: 3px; height: 2px; background: var(--rule); }
+.slot .meter b { display: block; height: 100%; width: var(--p, 0%); background: var(--c); transition: width 1s linear; }
+.slot[data-state='permission'] { background: var(--warn-tint); }
+.slot[data-state='permission'] .lbl { color: var(--warn); }
+.slot[data-state='permission'] .meter b { width: 100%; background: var(--warn); animation: pulse 1.1s steps(2) infinite; }
+.slot[data-state='error'] .lbl { color: var(--bad); } .slot[data-state='error'] .meter b { width: 100%; background: var(--bad); }
+.slot[data-state='idle'] .meter b, .slot[data-state='sleeping'] .meter b { width: 0; }
+.dock .tail { display: flex; align-items: center; gap: 8px; padding: 0 12px; white-space: nowrap; border-left: 1px solid var(--rule); color: var(--dim); font: 500 11px var(--mono); }
+.dock .tail i { width: 7px; height: 7px; background: var(--ok); }
+
+.fly { position: absolute; top: 74px; left: 50%; width: min(452px, calc(100% - 32px)); translate: -50% 0; border: 1px solid #3A3A35; border-radius: 6px; background: var(--panel); box-shadow: 0 16px 40px rgba(0,0,0,.5); }
+.fly[hidden] { display: none; }
+.fly header { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--rule); }
+.fly header .who { display: grid; min-width: 0; margin-right: auto; }
+.fly header b { color: var(--c); font: 600 15px var(--sans); }
+.fly header span { overflow: hidden; color: var(--dim); font: 400 11px var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.fly .now { padding: 12px 14px; border-bottom: 1px solid var(--rule); }
+.fly .now .what { display: flex; align-items: baseline; gap: 10px; font: 500 14px var(--sans); }
+.fly .now .what .tool { color: var(--dim); font: 400 12px var(--mono); }
+.fly .well { display: flex; align-items: flex-start; gap: 10px; margin-top: 8px; padding: 10px 10px 10px 12px; border: 1px solid var(--rule); border-radius: var(--r); background: var(--well); }
+.fly .well code { flex: 1; min-width: 0; font-size: 12.5px; overflow-wrap: anywhere; }
+.fly .well button { min-height: 28px; padding: 0 8px; border: 1px solid var(--rule-strong); border-radius: var(--r); background: none; color: var(--muted); font: 600 10px var(--mono); letter-spacing: .04em; }
+.fly .well button:hover { color: var(--fg); border-color: var(--fg); }
+.fly dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; border-bottom: 1px solid var(--rule); }
+.fly dl div { padding: 10px 14px; border-left: 1px solid var(--rule); }
+.fly dl div:first-child { border-left: 0; }
+.fly dt { color: var(--dim); font: 400 11px var(--mono); }
+.fly dd { margin: 2px 0 0; font: 600 14px var(--mono); font-variant-numeric: tabular-nums; }
+.fly ol { margin: 0; padding: 8px 14px; list-style: none; border-bottom: 1px solid var(--rule); }
+.fly ol li { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 8px; padding: 3px 0; font: 400 12px var(--mono); }
+.fly ol time { color: var(--dim); }
+.fly ol span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fly footer { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 14px; }
+.fly footer button { min-height: 36px; padding: 0 14px; border: 1px solid var(--rule-strong); border-radius: var(--r); background: none; font: 500 12px var(--mono); }
+.fly footer .primary { border-color: var(--fg); background: var(--fg); color: var(--bg); font-weight: 600; }
+.fly footer button:hover { border-color: var(--fg); }
+
+.ctx { position: absolute; top: 74px; right: 24px; width: 240px; padding: 4px; border: 1px solid #3A3A35; border-radius: 6px; background: var(--panel); box-shadow: 0 16px 40px rgba(0,0,0,.5); font: 400 13px var(--sans); }
+.ctx .h { padding: 6px 10px 4px; color: var(--dim); font: 400 11px var(--mono); }
+.ctx div.i { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 6px; min-height: 30px; padding: 0 10px; border-radius: 3px; }
+.ctx div.i:hover { background: var(--raise); }
+.ctx div.i small { color: var(--dim); font: 400 11px var(--mono); }
+.ctx hr { margin: 4px 6px; border: 0; border-top: 1px solid var(--rule); }
+
+/* ---------- antes / después ---------- */
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--rule); border-radius: var(--r); margin-top: 16px; }
+.compare > div { padding: 16px; } .compare > div + div { border-left: 1px solid var(--rule); }
+.compare h3 { margin: 0 0 8px; font: 600 13px var(--mono); }
+.compare ul { margin: 0; padding-left: 18px; color: var(--muted); }
+.compare li { margin: 4px 0; }
+
+@keyframes pulse { 50% { opacity: .25; } }
+@keyframes slidein { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 1099px) { .agents[data-cols='2'] { grid-template-columns: 1fr; } .agents[data-cols='2'] .agent { border-left: 0 !important; border-top: 1px solid var(--rule) !important; } .agents[data-cols='2'] .agent:first-child { border-top: 0 !important; } }
+@media (max-width: 760px) {
+  .wordmark span { display: none; }
+  .tools button span { display: none; }
+  .need { grid-template-columns: auto minmax(0, 1fr) auto; row-gap: 2px; padding-block: 10px; }
+  .need .tag { grid-column: 2; grid-row: 1; } .need .who { grid-column: 2; grid-row: 2; }
+  .need code { grid-column: 2; grid-row: 3; } .need time { display: none; }
+  .need .needs-light { grid-row: 1 / 4; } .need button { grid-column: 3; grid-row: 1 / 4; }
+  .agent { grid-template-columns: 92px minmax(0, 1fr); min-height: 0; }
+  .scope svg { width: 64px; height: 64px; } .scope .px { width: 60px; height: 60px; }
+  .readout { padding: 10px 12px; }
+  .r-head { flex-wrap: wrap; row-gap: 0; } .r-head .mascot-name, .section-head .right { display: none; }
+  .r-head h3 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; } .r-head .state { order: 3; flex-basis: 100%; }
+  .r-head .ctrl button { width: 32px; height: 32px; }
+  .ctx { display: none; }
+  .filters label:not(.search) { display: none; }
+  .seg { flex: 1 0 100%; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--rule); }
+  .log button { grid-template-columns: 62px minmax(0, 1fr); row-gap: 0; }
+  .log .ty { display: none; } .log .ag { grid-column: 2; grid-row: 1; } .log .tx { grid-column: 1 / -1; }
+  .log .tx code { display: none; }
+  .compare { grid-template-columns: 1fr; } .compare > div + div { border-left: 0; border-top: 1px solid var(--rule); }
+  .live span { display: none; }
+}
+@media (max-width: 420px) {
+  .slot { width: 54px; } .dock .tail { padding: 0 10px; font-size: 0; gap: 0; }
+  .scope { margin-left: 9px; }
+}
+/* ---------- mascotas: base común ---------- */
+.px { shape-rendering: crispEdges; }
+.px .whole { transform-box: fill-box; transform-origin: 50% 100%; }
+.px .prop, .px .fx { display: none; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes slidein { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@keyframes m-dot { 0% { opacity: .25; } 33% { opacity: 1; } 66% { opacity: .25; } }
+@keyframes m-blink { 50% { opacity: .2; } }
+@keyframes m-float { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-3px); opacity: .2; } }
+@keyframes px-bob { 50% { transform: translateY(-1px); } }
+@keyframes px-shake { 50% { transform: translateX(1px); } }
+@keyframes px-hop { 0%,100% { transform: translateY(0); } 25% { transform: translateY(-2px); } 50% { transform: translateY(-3px); } 75% { transform: translateY(-1px); } }
+
+/* Chispa — Claude Code (brasa pixel art con llama que parpadea; revisión 4c, diseño original) */
+.chispa .body { fill: #E5774A; } .chispa .core { fill: #F6B26B; } .chispa .shade { fill: #C25A34; } .chispa .eye { fill: #1A1210; }
+.chispa .tip-b, .chispa .eye-happy, .chispa .eye-x, .chispa .eye-shut { display: none; }
+.chispa[data-state='idle'] .tip-a { animation: chispa-tip-a 1.4s steps(1) infinite; }
+.chispa[data-state='idle'] .tip-b { display: inline; animation: chispa-tip-b 1.4s steps(1) infinite; }
+.chispa[data-state='idle'] .whole { animation: px-bob 2.8s steps(2) infinite; }
+.chispa[data-state='thinking'] .fx-think { display: inline; }
+.chispa[data-state='thinking'] .fx-think rect { animation: m-dot 1.2s steps(1) infinite; }
+.chispa[data-state='thinking'] .fx-think rect:nth-child(2) { animation-delay: .2s; }
+.chispa[data-state='thinking'] .fx-think rect:nth-child(3) { animation-delay: .4s; }
+.chispa[data-state='reading'] .prop-book { display: inline; }
+.chispa[data-state='editing'] .prop-pencil { display: inline; }
+.chispa[data-state='editing'] .core { animation: m-blink .5s steps(1) infinite; }
+.chispa[data-state='running'] .feet-a { animation: px-bob .4s steps(1) infinite; }
+.chispa[data-state='running'] .feet-b { animation: px-bob .4s steps(1) infinite reverse; }
+.chispa[data-state='running'] .tip-a { animation: chispa-tip-a .3s steps(1) infinite; }
+.chispa[data-state='running'] .tip-b { display: inline; animation: chispa-tip-b .3s steps(1) infinite; }
+.chispa[data-state='running'] .fx-run { display: inline; animation: m-blink .4s steps(1) infinite; }
+.chispa[data-state='permission'] .fx-ask { display: inline; }
+.chispa[data-state='permission'] .flame { transform: translateY(-1px); }
+.chispa[data-state='done'] .whole { animation: px-hop .8s steps(4) infinite; }
+.chispa[data-state='done'] .eye-open, .chispa[data-state='error'] .eye-open, .chispa[data-state='sleeping'] .eye-open { display: none; }
+.chispa[data-state='done'] .eye-happy { display: inline; }
+.chispa[data-state='done'] .fx-spark { display: inline; animation: m-blink .5s steps(1) infinite; }
+.chispa[data-state='error'] .whole { animation: px-shake .25s steps(2) infinite; }
+.chispa[data-state='error'] .body { fill: #C2665A; } .chispa[data-state='error'] .core { fill: #D98A7E; }
+.chispa[data-state='error'] .eye-x { display: inline; }
+.chispa[data-state='sleeping'] .eye-shut { display: inline; }
+.chispa[data-state='sleeping'] .tip-a, .chispa[data-state='sleeping'] .tip-b { display: none; }
+.chispa[data-state='sleeping'] .body { fill: #9A6A58; } .chispa[data-state='sleeping'] .core { fill: #B58C6E; } .chispa[data-state='sleeping'] .shade { fill: #7A5244; }
+.chispa[data-state='sleeping'] .fx-zz { display: inline; animation: m-float 2.4s steps(4) infinite; }
+@keyframes chispa-tip-a { 0% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes chispa-tip-b { 0% { opacity: 0; } 50% { opacity: 1; } }
+
+/* Nodo — Codex (hexágono de red con tres puertos y cara de glifo; revisión 4c, diseño original) */
+.nodo .cloud, .nodo .tilt { transform-box: fill-box; transform-origin: center; }
+.nodo .glyph { fill: none; stroke: #fff; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; }
+.nodo .glyph-fill { fill: #fff; }
+.nodo .port { fill: #C9C2FF; } .nodo .link { stroke: #C9C2FF; stroke-width: 4; stroke-linecap: round; }
+.nodo .face > g { display: none; }
+.nodo .face .f-idle { display: inline; }
+.nodo .cursor { animation: nodo-cursor 1.1s steps(1) infinite; }
+.nodo .stop-top { stop-color: #B9B4FF; } .nodo .stop-mid { stop-color: #7C74F2; } .nodo .stop-bot { stop-color: #4B3FD1; }
+.nodo .zz { display: none; }
+.nodo[data-state='idle'] .cloud { animation: nodo-breathe 3.2s ease-in-out infinite; }
+.nodo[data-state='thinking'] .face .f-idle, .nodo[data-state='running'] .face .f-idle, .nodo[data-state='permission'] .face .f-idle,
+.nodo[data-state='done'] .face .f-idle, .nodo[data-state='error'] .face .f-idle, .nodo[data-state='sleeping'] .face .f-idle { display: none; }
+.nodo[data-state='thinking'] .face .f-think { display: inline; }
+.nodo[data-state='thinking'] .f-think circle { animation: m-dot 1.2s steps(1) infinite; }
+.nodo[data-state='thinking'] .f-think circle:nth-child(2) { animation-delay: .2s; }
+.nodo[data-state='thinking'] .f-think circle:nth-child(3) { animation-delay: .4s; }
+.nodo[data-state='thinking'] .port { animation: m-dot 1.2s steps(1) infinite; }
+.nodo[data-state='reading'] .chev { animation: nodo-look 1.6s ease-in-out infinite; }
+.nodo[data-state='editing'] .cursor { animation: nodo-type .45s steps(3) infinite; transform-box: fill-box; transform-origin: 0 50%; }
+.nodo[data-state='running'] .face .f-run { display: inline; }
+.nodo[data-state='running'] .cloud { animation: nodo-sway .9s ease-in-out infinite; }
+.nodo[data-state='running'] .port { animation: m-blink .3s steps(1) infinite; }
+.nodo[data-state='permission'] .face .f-ask { display: inline; }
+.nodo[data-state='permission'] .stop-top { stop-color: #FFD27A; } .nodo[data-state='permission'] .stop-mid { stop-color: #F6A93B; } .nodo[data-state='permission'] .stop-bot { stop-color: #D9822B; }
+.nodo[data-state='permission'] .port { fill: #FBBF24; } .nodo[data-state='permission'] .link { stroke: #FBBF24; }
+.nodo[data-state='done'] .face .f-done { display: inline; }
+.nodo[data-state='done'] .cloud { animation: nodo-pop .9s ease-out infinite; }
+.nodo[data-state='error'] .face .f-err { display: inline; }
+.nodo[data-state='error'] .stop-top { stop-color: #FFA3A3; } .nodo[data-state='error'] .stop-mid { stop-color: #F26B6B; } .nodo[data-state='error'] .stop-bot { stop-color: #C93A4A; }
+.nodo[data-state='error'] .port { fill: #F87171; } .nodo[data-state='error'] .link { stroke: #F87171; }
+.nodo[data-state='sleeping'] .face .f-sleep { display: inline; }
+.nodo[data-state='sleeping'] .stop-top { stop-color: #706C98; } .nodo[data-state='sleeping'] .stop-mid { stop-color: #56528A; } .nodo[data-state='sleeping'] .stop-bot { stop-color: #3B3672; }
+.nodo[data-state='sleeping'] .port { fill: #3A4256; } .nodo[data-state='sleeping'] .link { stroke: #3A4256; }
+.nodo[data-state='sleeping'] .zz { display: inline; animation: m-float 2.4s ease-in-out infinite; }
+@keyframes nodo-cursor { 50% { opacity: 0; } }
+@keyframes nodo-breathe { 50% { transform: scale(1.03); } }
+@keyframes nodo-sway { 25% { transform: rotate(-6deg); } 75% { transform: rotate(6deg); } }
+@keyframes nodo-look { 50% { transform: translateX(6px); } }
+@keyframes nodo-type { 0% { transform: scaleX(.35); } 50% { transform: scaleX(.7); } 100% { transform: scaleX(1); } }
+@keyframes nodo-pop { 0% { transform: scale(1); } 30% { transform: scale(1.1); } 100% { transform: scale(1); } }
+@keyframes nodo-wobble { 25% { transform: rotate(-6deg); } 75% { transform: rotate(6deg); } }
+
+/* Astro — Antigravity (planetoide con anillo que levita; revisión 4c, diseño original) */
+.astro .float, .astro .bodyg, .astro .ground, .astro .orbit, .astro .ringg { transform-box: fill-box; transform-origin: center; }
+.astro .a1 { stop-color: #FFC2E2; } .astro .a2 { stop-color: #F28BC8; } .astro .a3 { stop-color: #9B6BE0; }
+.astro .ring { fill: none; stroke: #F7A8D6; stroke-width: 5; stroke-linecap: round; }
+.astro .ring-back { opacity: .5; }
+.astro .glyph { fill: none; stroke: #fff; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+.astro .glyph-fill { fill: #fff; }
+.astro .face > g, .astro .fx, .astro .zz { display: none; }
+.astro .face .f-idle { display: inline; }
+.astro[data-state='idle'] .float { animation: astro-float 3.2s ease-in-out infinite; }
+.astro[data-state='idle'] .ground { animation: astro-shadow 3.2s ease-in-out infinite; }
+.astro[data-state='thinking'] .float { transform: translateY(-4px); }
+.astro[data-state='thinking'] .face .f-idle { display: none; } .astro[data-state='thinking'] .face .f-think { display: inline; }
+.astro[data-state='thinking'] .f-think circle { animation: m-dot 1.2s steps(1) infinite; }
+.astro[data-state='thinking'] .f-think circle:nth-child(2) { animation-delay: .2s; }
+.astro[data-state='thinking'] .f-think circle:nth-child(3) { animation-delay: .4s; }
+.astro[data-state='thinking'] .orbit { display: inline; transform-box: view-box; transform-origin: 60px 62px; animation: astro-spin 2.4s linear infinite; }
+.astro[data-state='reading'] .f-idle { animation: astro-scan 1.6s ease-in-out infinite; }
+.astro[data-state='editing'] .face .f-idle { display: none; } .astro[data-state='editing'] .face .f-edit { display: inline; }
+.astro[data-state='editing'] .f-edit .cur { animation: nodo-cursor .8s steps(1) infinite; }
+.astro[data-state='running'] .ring { stroke-dasharray: 18 10; animation: astro-dash .6s linear infinite; }
+.astro[data-state='running'] .float { transform: translateY(-6px); }
+.astro[data-state='running'] .ground { transform: scaleX(.55); }
+.astro[data-state='running'] .trail { display: inline; animation: m-blink .35s steps(1) infinite; }
+.astro[data-state='permission'] .face .f-idle { display: none; } .astro[data-state='permission'] .face .f-ask { display: inline; }
+.astro[data-state='permission'] .a1 { stop-color: #FFD27A; } .astro[data-state='permission'] .a2 { stop-color: #F6A93B; } .astro[data-state='permission'] .a3 { stop-color: #D9822B; }
+.astro[data-state='permission'] .ring { stroke: #FBBF24; }
+.astro[data-state='permission'] .bodyg { animation: nodo-wobble .9s ease-in-out infinite; }
+.astro[data-state='done'] .face .f-idle { display: none; } .astro[data-state='done'] .face .f-done { display: inline; }
+.astro[data-state='done'] .bodyg { animation: nodo-pop .9s ease-out infinite; }
+.astro[data-state='done'] .burst { display: inline; animation: m-blink .6s steps(1) infinite; }
+.astro[data-state='error'] .face .f-idle { display: none; } .astro[data-state='error'] .face .f-err { display: inline; }
+.astro[data-state='error'] .a1 { stop-color: #FFA3A3; } .astro[data-state='error'] .a2 { stop-color: #F26B6B; } .astro[data-state='error'] .a3 { stop-color: #C93A4A; }
+.astro[data-state='error'] .ring { stroke: #F87171; }
+.astro[data-state='error'] .float { transform: translateY(8px) rotate(12deg); }
+.astro[data-state='error'] .ground { transform: scaleX(1.2); }
+.astro[data-state='sleeping'] .face .f-idle { display: none; } .astro[data-state='sleeping'] .face .f-sleep { display: inline; }
+.astro[data-state='sleeping'] .a1 { stop-color: #8A7C96; } .astro[data-state='sleeping'] .a2 { stop-color: #76668A; } .astro[data-state='sleeping'] .a3 { stop-color: #584E7E; }
+.astro[data-state='sleeping'] .ring { stroke: #6E6585; }
+.astro[data-state='sleeping'] .float { transform: translateY(8px); }
+.astro[data-state='sleeping'] .ground { transform: scaleX(1.2); }
+.astro[data-state='sleeping'] .zz { display: inline; animation: m-float 2.4s ease-in-out infinite; }
+@keyframes astro-float { 50% { transform: translateY(-6px); } }
+@keyframes astro-shadow { 50% { transform: scaleX(.75); opacity: .7; } }
+@keyframes astro-spin { to { transform: rotate(360deg); } }
+@keyframes astro-dash { to { stroke-dashoffset: -28; } }
+@keyframes astro-scan { 50% { transform: translateX(5px); } }
+
+/* Hondo — DeepSeek Harness (ballena geométrica de aletas horizontales y cara de glifo; revisión 4c, diseño original) */
+.hondo .swim, .hondo .tail, .hondo .face > g { transform-box: fill-box; }
+.hondo .swim, .hondo .face > g { transform-origin: center; }
+.hondo .tail { transform-origin: 100% 50%; }
+.hondo .h1 { stop-color: #8FE3F0; } .hondo .h2 { stop-color: #2FA7C9; } .hondo .h3 { stop-color: #1F6E9E; }
+.hondo .pleat { fill: none; stroke: #E6FBFF; stroke-width: 2; stroke-linecap: round; opacity: .35; }
+.hondo .glyph { fill: none; stroke: #fff; stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
+.hondo .glyph-fill { fill: #fff; }
+.hondo .face > g, .hondo .zz, .hondo .jet { display: none; }
+.hondo .face .f-idle { display: inline; }
+.hondo .wake { opacity: 0; transition: opacity .2s; }
+.hondo[data-state='idle'] .swim { animation: hondo-drift 4s ease-in-out infinite; }
+.hondo[data-state='thinking'] .face .f-idle { display: none; } .hondo[data-state='thinking'] .face .f-think { display: inline; }
+.hondo[data-state='thinking'] .f-think circle { animation: m-dot 1.2s steps(1) infinite; }
+.hondo[data-state='thinking'] .f-think circle:nth-child(2) { animation-delay: .2s; }
+.hondo[data-state='thinking'] .f-think circle:nth-child(3) { animation-delay: .4s; }
+.hondo[data-state='reading'] .f-idle { animation: astro-scan 1.6s ease-in-out infinite; }
+.hondo[data-state='editing'] .face .f-idle { display: none; } .hondo[data-state='editing'] .face .f-edit { display: inline; }
+.hondo[data-state='editing'] .f-edit .cur { animation: nodo-cursor .8s steps(1) infinite; }
+.hondo[data-state='editing'] .tail { animation: hondo-wag .6s ease-in-out infinite; }
+.hondo[data-state='running'] .face .f-idle { display: none; } .hondo[data-state='running'] .face .f-run { display: inline; }
+.hondo[data-state='running'] .swim { animation: hondo-swim .8s ease-in-out infinite; }
+.hondo[data-state='running'] .tail { animation: hondo-wag .4s ease-in-out infinite; }
+.hondo[data-state='running'] .wake { opacity: 1; }
+.hondo[data-state='permission'] .face .f-idle { display: none; } .hondo[data-state='permission'] .face .f-ask { display: inline; }
+.hondo[data-state='permission'] .h1 { stop-color: #FFD27A; } .hondo[data-state='permission'] .h2 { stop-color: #F6A93B; } .hondo[data-state='permission'] .h3 { stop-color: #D9822B; }
+.hondo[data-state='done'] .face .f-idle { display: none; } .hondo[data-state='done'] .face .f-done { display: inline; }
+.hondo[data-state='done'] .jet { display: inline; animation: m-blink .7s ease-in-out infinite; }
+.hondo[data-state='error'] .face .f-idle { display: none; } .hondo[data-state='error'] .face .f-err { display: inline; }
+.hondo[data-state='error'] .h1 { stop-color: #FFA3A3; } .hondo[data-state='error'] .h2 { stop-color: #F26B6B; } .hondo[data-state='error'] .h3 { stop-color: #C93A4A; }
+.hondo[data-state='error'] .swim { animation: px-shake .2s steps(2) infinite; }
+.hondo[data-state='sleeping'] .face .f-idle { display: none; } .hondo[data-state='sleeping'] .face .f-sleep { display: inline; }
+.hondo[data-state='sleeping'] .h1 { stop-color: #6E98A3; } .hondo[data-state='sleeping'] .h2 { stop-color: #4E7486; } .hondo[data-state='sleeping'] .h3 { stop-color: #35526A; }
+.hondo[data-state='sleeping'] .swim { transform: translateY(4px); }
+.hondo[data-state='sleeping'] .zz { display: inline; animation: m-float 2.4s ease-in-out infinite; }
+@keyframes hondo-drift { 50% { transform: translateY(-3px); } }
+@keyframes hondo-swim { 0%,100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
+@keyframes hondo-wag { 50% { transform: rotate(-10deg); } }
+
+/* Michi — mascota del usuario (gato pixel art; sustituye a Vigía en la revisión 4) */
+.michi { shape-rendering: crispEdges; overflow: visible; }
+.michi .fur { fill: #8E97B0; } .michi .fur-d { fill: #6E7790; } .michi .fur-l { fill: #B9C1D6; }
+.michi .iris { fill: #C9C2FF; } .michi .pupil { fill: #0A0D14; } .michi .nose { fill: #E9A3B8; } .michi .collar { fill: #8B7CF6; } .michi .whisk { fill: #6E7A96; }
+.michi .whole { transform-box: fill-box; transform-origin: 50% 100%; }
+.michi .tail-b, .michi .tail-up, .michi .eye-happy, .michi .eye-shut, .michi .fx { display: none; }
+.michi[data-mood='watching'] .tail-a { animation: michi-tail-a 1.6s steps(1) infinite; }
+.michi[data-mood='watching'] .tail-b { display: inline; animation: michi-tail-b 1.6s steps(1) infinite; }
+.michi[data-mood='alert'] .tail-a { display: none; } .michi[data-mood='alert'] .tail-up { display: inline; }
+.michi[data-mood='alert'] .ears { transform: translateY(-1px); }
+.michi[data-mood='alert'] .fx-ask { display: inline; animation: m-blink .8s steps(1) infinite; }
+.michi[data-mood='alarm'] .tail-a { display: none; } .michi[data-mood='alarm'] .tail-up { display: inline; }
+.michi[data-mood='alarm'] .whole { animation: px-shake .22s steps(2) infinite; }
+.michi[data-mood='alarm'] .fx-bang { display: inline; }
+.michi[data-mood='happy'] .eyes-open { display: none; } .michi[data-mood='happy'] .eye-happy { display: inline; }
+.michi[data-mood='happy'] .whole { animation: px-hop .9s steps(4) infinite; }
+.michi[data-mood='sleeping'] .eyes-open, .michi[data-mood='alone'] .eyes-open { display: none; }
+.michi[data-mood='sleeping'] .eye-shut, .michi[data-mood='alone'] .eye-shut { display: inline; }
+.michi[data-mood='sleeping'] .fx-zz, .michi[data-mood='alone'] .fx-zz { display: inline; animation: m-float 2.4s steps(4) infinite; }
+.michi[data-mood='sleeping'] .upper, .michi[data-mood='alone'] .upper { transform: translateY(1px); }
+@keyframes michi-tail-a { 0% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes michi-tail-b { 0% { opacity: 0; } 50% { opacity: 1; } }
+
+/* ---------- calma ---------- */
+.calm *, .calm *::before, .calm *::after { animation: none !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; } }
+
+</style>
+</head>
+<body>
+<div class="proto-nav">
+  <nav aria-label="Vistas del prototipo">
+    <button data-go="web" aria-pressed="true">Web</button>
+    <button data-go="desk" aria-pressed="false">Barra de escritorio</button>
+    <button data-go="why" aria-pressed="false">Qué cambia</button>
+  </nav>
+  <span>Prototipo revisión 6 · <span class="sample">datos de ejemplo</span> · <button id="cycle" aria-pressed="false">simular actividad</button></span>
+</div>
+
+<!-- ============ WEB ============ -->
+<div class="shell on" data-view="web">
+  <header class="top">
+    <div class="wordmark">
+      <svg class="michi" id="michiTop" viewBox="0 0 24 24" role="img" aria-label="Michi vigilando"></svg>
+      <b>overseer</b><span>monitor local · solo lectura</span>
+    </div>
+    <span class="live"><i></i><span>en vivo</span> <time id="clock">14:02:31</time></span>
+    <div class="tools" role="toolbar" aria-label="Controles">
+      <button aria-pressed="false"><span>pausa</span><kbd>P</kbd></button>
+      <button aria-pressed="false" id="calmBtn"><span>calma</span><kbd>C</kbd></button>
+      <button aria-pressed="false"><span>vista</span><kbd>V</kbd></button>
+      <button aria-label="Atajos"><kbd>?</kbd></button>
+    </div>
+  </header>
+
+  <section class="needs" id="needs" aria-live="polite" aria-label="Agentes que te necesitan"></section>
+
+  <div class="section-head"><h2>Agentes</h2><span id="agentCount">4 detectados</span><span class="right">arrastra el borde para reordenar · ⋯ opciones</span></div>
+  <div class="agents" id="agents" data-cols="2"></div>
+
+  <div class="section-head"><h2>Registro</h2><span id="evCount">14 eventos</span><span class="right"><kbd>/</kbd> buscar</span></div>
+  <div class="filters">
+    <div class="seg" id="agentFilter" role="group" aria-label="Filtrar por agente"></div>
+    <label>sesión <select><option>todas</option><option>tienda-demo</option></select></label>
+    <label>tipo <select><option>todos</option><option>herramienta</option><option>permiso</option><option>error</option></select></label>
+    <label class="search"><span class="sr-only">Buscar en eventos</span><span aria-hidden="true">/</span><input placeholder="buscar en eventos" id="q"></label>
+  </div>
+  <ol class="log" id="log"></ol>
+
+  <footer class="status-line"><span>127.0.0.1:8787</span><span>4 agentes · 4 sesiones activas</span><span>solo lectura · nada sale de este equipo</span><span class="right"><kbd>?</kbd> atajos</span></footer>
+</div>
+
+<!-- ============ ESCRITORIO ============ -->
+<div class="desk" data-view="desk">
+  <div class="dock" role="toolbar" aria-label="Agentes" id="dock">
+    <div class="tail"><i></i>en vivo</div>
+  </div>
+  <div class="fly" id="fly" role="dialog" aria-modal="false" hidden></div>
+  <div class="ctx" aria-hidden="true">
+    <div class="h">clic derecho en la barra</div>
+    <div class="i"><span>✓</span>Agentes visibles<small>›</small></div>
+    <div class="i"><span>✓</span>Siempre visible<small></small></div>
+    <div class="i"><span></span>Modo calma<small></small></div>
+    <hr>
+    <div class="i"><span></span>Abrir versión web<small></small></div>
+    <div class="i"><span></span>Ocultar barra<small>Ctrl+Shift+O</small></div>
+    <div class="i"><span></span>Salir<small></small></div>
+  </div>
+  <p class="note">La barra cuelga del borde superior de la pantalla como una pestaña, no flota como una píldora. Haz clic en una mascota para desplegar su panel. La barra fina bajo cada mascota se llena en 60 s en el mismo estado.</p>
+</div>
+
+<!-- ============ QUÉ CAMBIA ============ -->
+<div class="shell" data-view="why">
+  <div class="section-head"><h2>Por qué se veía genérico y qué lo sustituye</h2></div>
+  <div class="compare">
+    <div><h3>Revisión 5 (antes)</h3><ul>
+      <li>Azul-negro con halo radial y lavanda #A99BFF como marca: la paleta por defecto de los productos de IA.</li>
+      <li>Tarjeta › escenario › tarjeta «Ahora» › mosaicos de métricas: cuatro niveles de cajas redondeadas.</li>
+      <li>Rótulos mono en mayúsculas sobre cada bloque (MONITOR LOCAL, AHORA, REGISTRO EN VIVO).</li>
+      <li>Mosaicos «Herramientas 2 · Eventos 5» que no ayudan a decidir nada.</li>
+      <li>Un agente pidiendo permiso solo cambia el color de una píldora pequeña.</li>
+      <li>Registro con filas de 76 px y píldoras: 6 eventos por pantalla.</li>
+      <li>Barra de escritorio: píldora flotante con desenfoque y sombra difusa.</li>
+    </ul></div>
+    <div><h3>Revisión 6 (consola de instrumentos)</h3><ul>
+      <li>Carbón cálido #0D0D0C y texto papel #ECE8DF. Sin color de marca: el color es de las mascotas y de lo que exige atención.</li>
+      <li>Una superficie por zona, dividida con filetes de 1 px. Radios de 4 px.</li>
+      <li>Títulos en minúscula y sin rótulos superiores; el mono se reserva para datos (rutas, comandos, horas).</li>
+      <li>Una línea de medidas: tiempo en el estado, sesión, modelo y número de herramientas.</li>
+      <li>Franja «te necesita» arriba, en ámbar o rojo, con el comando exacto y un botón. La fila del agente también se tiñe.</li>
+      <li>Registro tipo log a 40 px por fila: más del doble de eventos visibles.</li>
+      <li>Barra colgada del borde superior, opaca, con divisiones y una barra de progreso en vez de anillo.</li>
+    </ul></div>
+  </div>
+  <div class="compare">
+    <div><h3>Se conserva sin cambios</h3><ul>
+      <li>Las cinco mascotas, sus nueve estados, subestados y animaciones (revisiones 4c y 5).</li>
+      <li>Funciones: reordenar, ocultar, selección múltiple, foco, densidad, vista dock, flyout, ajustes, atajos.</li>
+      <li>Solo modo oscuro, modo calma y reduced-motion.</li>
+      <li>Colores de acento de los cuatro agentes.</li>
+    </ul></div>
+    <div><h3>Tipografía</h3><ul>
+      <li>IBM Plex Sans para texto y nombres; JetBrains Mono para datos y controles.</li>
+      <li>Se retira Bricolage Grotesque (la familia display de moda que aportaba el tono «startup»).</li>
+      <li>En WPF: Segoe UI Variable y Cascadia Mono, ya instaladas en Windows.</li>
+    </ul></div>
+  </div>
+</div>
+
+<div id="sr" class="sr-only" aria-live="polite"></div>
+<script>
+(() => {
+  const r = (x, y, w, h, c) => `<rect class="${c}" x="${x}" y="${y}" width="${w}" height="${h}"/>`;
+  const rf = (x, y, w, h, f) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${f}"/>`;
+
+  /* ---------- plantillas SVG ---------- */
+  const SVG = {
+    chispa: () => `<svg class="chispa px" viewBox="0 0 24 24" role="img"><g class="whole">
+      <g class="feet-a">${r(9,18,2,1,'shade')}</g><g class="feet-b">${r(13,18,2,1,'shade')}</g>
+      <g class="flame">
+        <g class="tip-a">${r(12,3,1,1,'body')}${r(11,4,2,1,'body')}${r(11,5,3,1,'body')}</g>
+        <g class="tip-b">${r(11,3,1,1,'body')}${r(11,4,2,1,'body')}${r(11,5,3,1,'body')}${r(13,4,1,1,'body')}</g>
+        ${r(10,6,4,1,'body')}${r(9,7,6,1,'body')}${r(8,8,8,1,'body')}${r(7,9,10,7,'body')}${r(8,16,8,1,'body')}${r(9,17,6,1,'shade')}
+        ${r(11,12,2,1,'core')}${r(10,13,4,3,'core')}${r(11,16,2,1,'core')}
+      </g>
+      <g class="eyes" data-look><g class="eye-open">${r(10,10,1,2,'eye')}${r(13,10,1,2,'eye')}</g>
+        <g class="eye-happy">${r(9,11,1,1,'eye')}${r(10,10,1,1,'eye')}${r(11,11,1,1,'eye')}${r(12,11,1,1,'eye')}${r(13,10,1,1,'eye')}${r(14,11,1,1,'eye')}</g>
+        <g class="eye-x">${r(9,10,1,1,'eye')}${r(11,10,1,1,'eye')}${r(10,11,1,1,'eye')}${r(9,12,1,1,'eye')}${r(11,12,1,1,'eye')}${r(12,10,1,1,'eye')}${r(14,10,1,1,'eye')}${r(13,11,1,1,'eye')}${r(12,12,1,1,'eye')}${r(14,12,1,1,'eye')}</g>
+        <g class="eye-shut">${r(9,11,2,1,'eye')}${r(13,11,2,1,'eye')}</g></g>
+      <g class="prop prop-book">${rf(2,12,4,3,'#E8ECF4')}${rf(4,12,1,3,'#98A2B8')}</g><g class="prop prop-pencil">${rf(19,8,1,4,'#FBBF24')}${rf(19,12,1,1,'#E8ECF4')}</g>
+      <g class="fx fx-think">${rf(16,2,1,1,'#E8ECF4')}${rf(18,2,1,1,'#E8ECF4')}${rf(20,2,1,1,'#E8ECF4')}</g>
+      <g class="fx fx-run">${rf(5,7,1,1,'#F6B26B')}${rf(18,5,1,1,'#F6B26B')}${rf(4,11,1,1,'#E5774A')}${rf(19,10,1,1,'#E5774A')}</g>
+      <g class="fx fx-ask">${ask(17,0)}</g>
+      <g class="fx fx-spark">${rf(4,5,1,1,'#FBBF24')}${rf(19,4,1,1,'#FBBF24')}${rf(6,2,1,1,'#FBBF24')}</g>
+      <g class="fx fx-zz">${zz(17,2)}</g></g></svg>`,
+    nodo: (uid) => `<svg class="nodo" viewBox="0 0 120 120" role="img"><defs><linearGradient id="${uid}" x1="0" y1="16" x2="0" y2="104" gradientUnits="userSpaceOnUse">
+      <stop class="stop-top" offset="0"/><stop class="stop-mid" offset=".5"/><stop class="stop-bot" offset="1"/></linearGradient></defs>
+      <ellipse cx="60" cy="116" rx="30" ry="3.5" fill="rgba(0,0,0,.55)"/>
+      <g class="tilt" data-look><g class="cloud">
+        <line class="link" x1="60" y1="20" x2="60" y2="6"/><line class="link" x1="95" y1="80" x2="107" y2="87"/><line class="link" x1="25" y1="80" x2="13" y2="87"/>
+        <circle class="port" cx="60" cy="6" r="5.5"/><circle class="port" cx="107" cy="87" r="5.5"/><circle class="port" cx="13" cy="87" r="5.5"/>
+        <polygon points="60,20 95,40 95,80 60,100 25,80 25,40" fill="url(#${uid})" stroke="url(#${uid})" stroke-width="14" stroke-linejoin="round"/>
+      </g>
+      <g class="face"><g class="f-idle"><polyline class="glyph chev" points="40,48 51,60 40,72"/><line class="glyph cursor" x1="60" y1="72" x2="78" y2="72"/></g>
+        <g class="f-think"><circle class="glyph-fill" cx="45" cy="60" r="4.5"/><circle class="glyph-fill" cx="60" cy="60" r="4.5"/><circle class="glyph-fill" cx="75" cy="60" r="4.5"/></g>
+        <g class="f-run"><polyline class="glyph" points="36,48 47,60 36,72"/><polyline class="glyph c2" points="52,48 63,60 52,72"/><line class="glyph cursor" x1="68" y1="72" x2="82" y2="72"/></g>
+        <g class="f-ask"><path class="glyph" d="M51 49 q9 -9 18 0 q3 9 -9 12 v5"/><circle class="glyph-fill" cx="60" cy="76" r="4"/></g>
+        <g class="f-done"><polyline class="glyph" points="44,60 55,71 76,48"/></g>
+        <g class="f-err"><line class="glyph" x1="47" y1="47" x2="73" y2="73"/><line class="glyph" x1="73" y1="47" x2="47" y2="73"/></g>
+        <g class="f-sleep"><line class="glyph" x1="40" y1="60" x2="52" y2="60"/><line class="glyph" x1="68" y1="60" x2="80" y2="60"/></g></g></g>
+      <g class="zz"><text x="98" y="26" fill="#98A2B8" font-family="ui-monospace,monospace" font-size="16">z</text></g></svg>`,
+    astro: (uid) => `<svg class="astro" viewBox="0 0 120 120" role="img"><defs><linearGradient id="${uid}" x1="30" y1="30" x2="92" y2="96" gradientUnits="userSpaceOnUse">
+      <stop class="a1" offset="0"/><stop class="a2" offset=".5"/><stop class="a3" offset="1"/></linearGradient></defs>
+      <ellipse class="ground" cx="60" cy="114" rx="24" ry="3.5" fill="rgba(0,0,0,.55)"/>
+      <g class="float"><g data-look><g class="bodyg">
+        <g class="fx trail" stroke="#B58CF0" stroke-width="3" stroke-linecap="round"><line x1="46" y1="102" x2="46" y2="110"/><line x1="60" y1="104" x2="60" y2="114"/><line x1="74" y1="102" x2="74" y2="110"/></g>
+        <g transform="rotate(-16 60 62)"><path class="ring ring-back" d="M8 62 A52 14 0 0 1 112 62"/></g>
+        <circle cx="60" cy="62" r="33" fill="url(#${uid})"/>
+        <g transform="rotate(-16 60 62)"><path class="ring" d="M8 62 A52 14 0 0 0 112 62"/></g>
+        <g class="face">
+          <g class="f-idle"><rect class="glyph-fill" x="50" y="50" width="6" height="12" rx="3"/><rect class="glyph-fill" x="64" y="50" width="6" height="12" rx="3"/></g>
+          <g class="f-think"><circle class="glyph-fill" cx="50" cy="56" r="3.4"/><circle class="glyph-fill" cx="60" cy="56" r="3.4"/><circle class="glyph-fill" cx="70" cy="56" r="3.4"/></g>
+          <g class="f-edit"><rect class="glyph-fill" x="50" y="50" width="6" height="12" rx="3"/><line class="glyph cur" x1="64" y1="62" x2="72" y2="62"/></g>
+          <g class="f-ask"><path class="glyph" d="M53 49 q7 -8 14 0 q2 7 -7 10 v4"/><circle class="glyph-fill" cx="60" cy="68" r="2.8"/></g>
+          <g class="f-done"><polyline class="glyph" points="50,56 57,63 71,49"/></g>
+          <g class="f-err"><line class="glyph" x1="52" y1="49" x2="68" y2="65"/><line class="glyph" x1="68" y1="49" x2="52" y2="65"/></g>
+          <g class="f-sleep"><line class="glyph" x1="49" y1="57" x2="56" y2="57"/><line class="glyph" x1="64" y1="57" x2="71" y2="57"/></g>
+        </g>
+      </g></g></g>
+      <g class="fx orbit"><circle cx="104" cy="40" r="5" fill="#F7A8D6"/></g>
+      <g class="fx burst" fill="#FFD27A"><circle cx="18" cy="26" r="3.5"/><circle cx="102" cy="22" r="2.5"/><circle cx="106" cy="94" r="3"/></g>
+      <g class="zz"><text x="96" y="24" fill="#98A2B8" font-family="ui-monospace,monospace" font-size="16">z</text></g></svg>`,
+    hondo: (uid) => `<svg class="hondo" viewBox="0 0 120 120" role="img"><defs><linearGradient id="${uid}" x1="0" y1="34" x2="0" y2="96" gradientUnits="userSpaceOnUse">
+      <stop class="h1" offset="0"/><stop class="h2" offset=".55"/><stop class="h3" offset="1"/></linearGradient></defs>
+      <ellipse cx="62" cy="110" rx="36" ry="3.5" fill="rgba(0,0,0,.55)"/>
+      <g class="wake" stroke="#5CC8F5" stroke-width="3" stroke-linecap="round" fill="none"><line x1="2" y1="94" x2="14" y2="94"/><line x1="6" y1="102" x2="18" y2="102"/></g>
+      <g class="swim"><g data-look>
+        <path class="tail" d="M34 64 L20 61 C16 52 8 48 4 51 C8 56 11 61 13 66 C11 71 8 76 4 81 C8 84 16 80 20 71 L34 70 Z" fill="url(#${uid})"/>
+        <path d="M108 66 C108 46 92 36 70 36 C50 36 36 46 31 60 C29 68 31 78 37 84 C47 94 59 96 71 96 C93 96 108 84 108 66 Z" fill="url(#${uid})"/>
+        <path class="pleat" d="M60 91 Q82 92 100 79"/><path class="pleat" d="M56 85 Q78 87 96 74"/>
+        <g class="face">
+          <g class="f-idle"><circle class="glyph-fill" cx="88" cy="58" r="4.5"/></g>
+          <g class="f-think"><circle class="glyph-fill" cx="78" cy="60" r="3"/><circle class="glyph-fill" cx="87" cy="60" r="3"/><circle class="glyph-fill" cx="96" cy="60" r="3"/></g>
+          <g class="f-edit"><circle class="glyph-fill" cx="88" cy="58" r="4.5"/><line class="glyph cur" x1="80" y1="70" x2="94" y2="70"/></g>
+          <g class="f-run"><polyline class="glyph" points="80,51 87,58 80,65"/><polyline class="glyph" points="89,51 96,58 89,65"/></g>
+          <g class="f-ask"><path class="glyph" d="M82 51 q6 -7 12 0 q2 6 -6 9 v3"/><circle class="glyph-fill" cx="88" cy="68" r="2.6"/></g>
+          <g class="f-done"><polyline class="glyph" points="80,59 86,65 97,52"/></g>
+          <g class="f-err"><line class="glyph" x1="82" y1="52" x2="94" y2="64"/><line class="glyph" x1="94" y1="52" x2="82" y2="64"/></g>
+          <g class="f-sleep"><line class="glyph" x1="82" y1="59" x2="94" y2="59"/></g>
+        </g>
+      </g></g>
+      <g class="jet" stroke="#9BE2FF" stroke-width="3" stroke-linecap="round" fill="none"><path d="M78 32 C74 22 68 18 60 18"/><path d="M82 32 C86 22 92 18 100 18"/><line x1="80" y1="30" x2="80" y2="14"/></g>
+      <g class="zz"><text x="100" y="30" fill="#98A2B8" font-family="ui-monospace,monospace" font-size="16">z</text></g></svg>`,
+  };
+  function ask(x, y) { return rf(x,y+1,7,8,'#FBBF24') + rf(x+2,y+2,3,1,'#0A0D14') + rf(x+1,y+3,1,1,'#0A0D14') + rf(x+5,y+3,1,1,'#0A0D14') + rf(x+4,y+4,1,1,'#0A0D14') + rf(x+3,y+5,1,1,'#0A0D14') + rf(x+3,y+7,1,1,'#0A0D14'); }
+  function zz(x, y) { return rf(x,y+1,4,1,'#98A2B8') + rf(x+2,y+2,1,1,'#98A2B8') + rf(x+1,y+3,1,1,'#98A2B8') + rf(x,y+4,4,1,'#98A2B8'); }
+
+  /* Michi: gato sentado de frente, rejilla 24×24 */
+  function michiMarkup(leds) {
+    return `<g class="whole">
+      <g class="tail-a">${r(18,18,2,1,'fur-d')}${r(20,15,1,4,'fur-d')}${r(21,13,1,3,'fur-d')}</g>
+      <g class="tail-b">${r(18,18,2,1,'fur-d')}${r(20,16,1,3,'fur-d')}${r(21,15,1,2,'fur-d')}${r(22,13,1,3,'fur-d')}</g>
+      <g class="tail-up">${r(18,18,1,1,'fur-d')}${r(19,10,1,9,'fur-d')}${r(20,9,1,2,'fur-d')}</g>
+      ${r(6,13,12,7,'fur')}${r(9,15,6,5,'fur-l')}${r(7,20,3,1,'fur-l')}${r(14,20,3,1,'fur-l')}
+      <g class="upper">
+        <g class="ears" data-ears>${r(5,3,1,1,'fur')}${r(5,4,2,1,'fur')}${r(5,5,3,1,'fur')}${r(6,5,1,1,'nose')}${r(18,3,1,1,'fur')}${r(17,4,2,1,'fur')}${r(16,5,3,1,'fur')}${r(17,5,1,1,'nose')}</g>
+        ${r(5,6,14,7,'fur')}${r(5,12,14,1,'fur-d')}
+        ${r(2,10,3,1,'whisk')}${r(2,8,3,1,'whisk')}${r(19,10,3,1,'whisk')}${r(19,8,3,1,'whisk')}
+        <g class="eyes-open">${r(8,8,2,2,'iris')}${r(14,8,2,2,'iris')}<g data-pupils>${r(8,8,1,2,'pupil')}${r(14,8,1,2,'pupil')}</g></g>
+        <g class="eye-happy">${r(8,9,1,1,'pupil')}${r(9,8,1,1,'pupil')}${r(10,9,1,1,'pupil')}${r(13,9,1,1,'pupil')}${r(14,8,1,1,'pupil')}${r(15,9,1,1,'pupil')}</g>
+        <g class="eye-shut">${r(8,9,2,1,'pupil')}${r(14,9,2,1,'pupil')}</g>
+        ${r(11,10,2,1,'nose')}
+      </g>
+      ${r(6,13,12,1,'collar')}${leds}
+      <g class="fx fx-ask">${ask(17,-3)}</g>
+      <g class="fx fx-bang">${rf(20,0,2,5,'#F87171')}${rf(20,6,2,2,'#F87171')}</g>
+      <g class="fx fx-zz">${zz(18,0)}</g></g>`;
+  }
+  function ledMarkup(ids) {
+    const n = ids.length, start = 12 - n;
+    return ids.map((id, i) => `<rect data-led="${id}" x="${start + i * 2}" y="14" width="1" height="1" fill="#3A4256"/>`).join('');
+  }
+
+
+  /* ---------- datos de ejemplo ---------- */
+  const AG = {
+    claude: { name: 'Claude Code', kind: 'chispa', mascot: 'Chispa', color: 'var(--claude)', session: 'tienda-demo', model: 'sonnet' },
+    codex: { name: 'Codex', kind: 'nodo', mascot: 'Nodo', color: 'var(--codex)', session: 'tienda-demo', model: 'codex' },
+    antigravity: { name: 'Antigravity', kind: 'astro', mascot: 'Astro', color: 'var(--antigravity)', session: 'tienda-demo', model: 'gemini' },
+    deepseek: { name: 'DeepSeek Harness', kind: 'hondo', mascot: 'Hondo', color: 'var(--deepseek)', session: 'tienda-demo', model: 'deepseek' },
+  };
+  const ORDER = ['claude', 'codex', 'antigravity', 'deepseek'];
+  const LABEL = { idle: 'en espera', thinking: 'pensando', reading: 'leyendo', editing: 'editando', running: 'ejecutando', permission: 'pide permiso', done: 'terminó', error: 'error', sleeping: 'durmiendo' };
+  const SHORT = { idle: 'ESPERA', thinking: 'PIENSA', reading: 'LEE', editing: 'EDITA', running: 'EJECUTA', permission: 'PERMISO', done: 'LISTO', error: 'ERROR', sleeping: 'DUERME' };
+  const SCRIPT = {
+    claude: [['editing', 'Edita ResumenCarrito.ts', 'Edit', 'src/carrito/ResumenCarrito.ts'], ['reading', 'Lee las pruebas del carrito', 'Read', 'tests/carrito/resumen.spec.ts'], ['thinking', 'Revisa el cálculo del subtotal', '', ''], ['done', 'Turno terminado', '', '3 archivos cambiados']],
+    codex: [['permission', 'Pide permiso para ejecutar', 'exec', 'npm test -- carrito --watch=false'], ['running', 'Ejecuta las pruebas del carrito', 'exec', 'npm test -- carrito'], ['error', 'Las pruebas fallan', 'exec', '2 de 14 pruebas fallan · resumen.spec.ts:48']],
+    antigravity: [['reading', 'Inspecciona un archivo', 'view_file', 'src/carrito/ResumenCarrito.ts'], ['editing', 'Reescribe el componente', 'replace_file_content', 'src/carrito/Carrito.tsx'], ['idle', 'Esperando instrucciones', '', '']],
+    deepseek: [['running', 'Compila la aplicación', 'shell', 'npx ng build --configuration production'], ['thinking', 'Analiza el informe de build', '', ''], ['sleeping', 'Sin actividad hace 10 min', '', '']],
+  };
+  const st = Object.fromEntries(ORDER.map((id) => [id, { i: 0, since: Date.now() - (id === 'codex' ? 12e3 : 36e3 + Math.random() * 9e4), tools: 2 + Math.floor(Math.random() * 6) }]));
+  const cur = (id) => SCRIPT[id][st[id].i];
+  const fmt = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`; };
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const mascot = (id, uid) => SVG[AG[id].kind](uid);
+
+  /* ---------- web: filas de agente ---------- */
+  const agentsEl = document.getElementById('agents');
+  function buildAgents() {
+    agentsEl.innerHTML = ORDER.map((id) => `
+      <article class="agent" id="row-${id}" style="--c:${AG[id].color}" aria-label="${AG[id].name}">
+        <div class="scope">${mascot(id, `w-${id}`)}</div>
+        <div class="readout">
+          <div class="r-head"><h3>${AG[id].name}</h3><span class="mascot-name">${AG[id].mascot}</span><span class="state" data-st></span>
+            <span class="ctrl"><button aria-label="Seleccionar ${AG[id].name}" title="Seleccionar">□</button><button aria-label="Opciones de ${AG[id].name}" title="Opciones">⋯</button></span></div>
+          <div class="task"><span class="what" data-what></span><code data-target></code></div>
+          <div class="meta" data-meta></div>
+        </div>
+      </article>`).join('');
+  }
+  function paintAgent(id) {
+    const [s, what, tool, target] = cur(id);
+    const row = document.getElementById(`row-${id}`);
+    row.dataset.state = s;
+    row.querySelector('svg').dataset.state = s;
+    row.querySelector('[data-st]').innerHTML = `<i></i>${LABEL[s]}`;
+    row.querySelector('[data-st]').dataset.s = s;
+    row.querySelector('[data-what]').textContent = what;
+    row.querySelector('[data-target]').innerHTML = target ? `${tool ? `<span class="k">${esc(tool)} › </span>` : ''}${esc(target)}` : '<span class="k">—</span>';
+    row.querySelector('[data-meta]').innerHTML = `<span>en estado <b class="big">${fmt(Date.now() - st[id].since)}</b></span><span>sesión <b>${AG[id].session}</b></span><span>modelo <b>${AG[id].model}</b></span><span><b>${st[id].tools}</b> herramientas</span>`;
+  }
+
+  /* ---------- franja «te necesita» ---------- */
+  function paintNeeds() {
+    const list = ORDER.filter((id) => ['permission', 'error'].includes(cur(id)[0]));
+    const el = document.getElementById('needs');
+    el.hidden = !list.length;
+    el.style.borderColor = list.some((id) => cur(id)[0] === 'error') && !list.some((id) => cur(id)[0] === 'permission') ? 'var(--bad)' : '';
+    el.innerHTML = list.map((id) => { const [s, what, , target] = cur(id); return `
+      <div class="need" data-kind="${s}"><i class="needs-light"></i><span class="tag">${s === 'permission' ? 'PIDE PERMISO' : 'ERROR'}</span>
+      <code><span class="who" style="color:${AG[id].color}">${AG[id].name}</span>&nbsp;&nbsp;${esc(target || what)}</code><time>hace ${fmt(Date.now() - st[id].since)}</time>
+      <button data-open="${id}">ver tarea</button></div>`; }).join('');
+  }
+
+  /* ---------- registro ---------- */
+  const EVENTS = [
+    ['14:02:31', 'codex', 'permiso', 'Pide permiso para ejecutar', 'npm test -- carrito --watch=false'],
+    ['14:02:18', 'claude', 'herramienta', 'Edit · ResumenCarrito.ts', 'src/carrito/ResumenCarrito.ts'],
+    ['14:02:02', 'deepseek', 'herramienta', 'Llamando a shell', 'npx ng build --configuration production'],
+    ['14:01:44', 'antigravity', 'herramienta', 'Llamando a view_file', 'src/carrito/ResumenCarrito.ts'],
+    ['14:01:40', 'codex', 'herramienta', 'Read · Lee las pruebas del carrito', 'tests/carrito/resumen.spec.ts'],
+    ['14:01:22', 'codex', 'prompt', 'Revisa las pruebas del carrito', 'Comprueba carritos vacíos y con productos.'],
+    ['14:01:03', 'claude', 'pensando', 'Revisa los componentes del carrito', 'src/carrito/'],
+    ['14:00:47', 'claude', 'prompt', 'Añade el resumen del carrito', 'Muestra el subtotal antes de confirmar la compra.'],
+    ['14:00:30', 'deepseek', 'sesión', 'Sesión de DeepSeek Harness iniciada', 'modelo: deepseek'],
+    ['14:00:12', 'antigravity', 'sesión', 'Sesión de Antigravity iniciada', 'modelo: gemini'],
+    ['13:59:58', 'codex', 'sesión', 'Sesión de Codex iniciada', 'modelo: codex'],
+    ['13:59:41', 'claude', 'sesión', 'Sesión de Claude Code iniciada', 'modelo: sonnet'],
+  ];
+  let filter = 'all';
+  function paintLog(newFirst) {
+    document.getElementById('log').innerHTML = EVENTS.filter((e) => filter === 'all' || e[1] === filter).map((e, i) => `
+      <li class="${newFirst && i === 0 ? 'new' : ''}"><button style="--c:${AG[e[1]].color}"><time>${e[0]}</time><span class="ag">${AG[e[1]].name}</span><span class="ty" data-t="${e[2]}">${e[2]}</span><span class="tx">${esc(e[3])}<code>${esc(e[4])}</code></span></button></li>`).join('');
+    document.getElementById('evCount').textContent = `${EVENTS.length} eventos`;
+  }
+  document.getElementById('agentFilter').innerHTML = `<button data-f="all" aria-pressed="true">todos</button>` +
+    ORDER.map((id) => `<button data-f="${id}" aria-pressed="false"><span class="sw" style="background:${AG[id].color}"></span>${AG[id].name.split(' ')[0].toLowerCase()}</button>`).join('');
+  document.getElementById('agentFilter').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return; filter = b.dataset.f;
+    document.querySelectorAll('#agentFilter button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); paintLog();
+  });
+
+  /* ---------- barra de escritorio ---------- */
+  const dock = document.getElementById('dock');
+  dock.insertAdjacentHTML('afterbegin', ORDER.map((id) => `
+    <button class="slot" id="slot-${id}" style="--c:${AG[id].color}" aria-expanded="false" aria-label="${AG[id].mascot}, ${AG[id].name}">
+      <span class="m">${mascot(id, `d-${id}`)}</span><span class="lbl" data-l></span><span class="meter"><b></b></span></button>`).join(''));
+  let open = 'codex';
+  function paintSlot(id) {
+    const s = cur(id)[0], el = document.getElementById(`slot-${id}`);
+    el.dataset.state = s; el.querySelector('svg').dataset.state = s; el.querySelector('[data-l]').textContent = SHORT[s];
+    el.style.setProperty('--p', `${Math.min(100, ((Date.now() - st[id].since) % 60000) / 600)}%`);
+    el.setAttribute('aria-expanded', String(open === id));
+  }
+  function paintFly() {
+    const fly = document.getElementById('fly');
+    if (!open) { fly.hidden = true; return; }
+    const id = open, [s, what, tool, target] = cur(id);
+    fly.hidden = false; fly.style.setProperty('--c', AG[id].color);
+    fly.setAttribute('aria-label', `Panel de ${AG[id].name}`);
+    fly.innerHTML = `
+      <header><div class="who"><b>${AG[id].name}</b><span>${AG[id].mascot} · sesión ${AG[id].session}-7f3a2c</span></div><span class="state" data-s="${s}"><i></i>${LABEL[s]}</span></header>
+      <div class="now"><div class="what">${esc(what)}${tool ? `<span class="tool">${esc(tool)}</span>` : ''}</div>
+        ${target ? `<div class="well"><code>${esc(target)}</code><button>COPIAR</button></div>` : ''}</div>
+      <dl><div><dt>en estado</dt><dd>${fmt(Date.now() - st[id].since)}</dd></div><div><dt>sesión</dt><dd>10 min 07 s</dd></div><div><dt>herramientas</dt><dd>${st[id].tools}</dd></div></dl>
+      <ol>${EVENTS.filter((e) => e[1] === id).slice(0, 3).map((e) => `<li><time>${e[0]}</time><span>${esc(e[3])}</span></li>`).join('')}</ol>
+      <footer><button data-close>cerrar</button><button class="primary">ver en la web</button></footer>`;
+  }
+  dock.addEventListener('click', (e) => { const b = e.target.closest('.slot'); if (!b) return; const id = b.id.slice(5); open = open === id ? null : id; ORDER.forEach(paintSlot); paintFly(); });
+  document.getElementById('fly').addEventListener('click', (e) => { if (e.target.closest('[data-close]')) { open = null; ORDER.forEach(paintSlot); paintFly(); } });
+
+  /* ---------- Michi ---------- */
+  function paintMichi() {
+    const ss = ORDER.map((id) => cur(id)[0]);
+    const mood = ss.includes('error') ? 'alarm' : ss.includes('permission') ? 'alert' : ss.some((s) => ['thinking', 'reading', 'editing', 'running'].includes(s)) ? 'watching' : ss.includes('done') ? 'happy' : 'sleeping';
+    const m = document.getElementById('michiTop');
+    m.innerHTML = michiMarkup(ledMarkup(ORDER)); m.dataset.mood = mood;
+    const ledColor = { claude: '#E5774A', codex: '#8FA2FF', antigravity: '#F28BC8', deepseek: '#5CC8F5' };
+    ORDER.forEach((id, i) => { const s = ss[i]; const led = m.querySelector(`[data-led="${id}"]`);
+      led.setAttribute('fill', s === 'permission' ? '#FBBF24' : s === 'error' ? '#F87171' : ['idle', 'sleeping'].includes(s) ? '#3A4256' : ledColor[id]); });
+  }
+
+  /* ---------- ciclo ---------- */
+  function paintAll(newEvent) { ORDER.forEach((id) => { paintAgent(id); paintSlot(id); }); paintNeeds(); paintMichi(); paintFly(); paintLog(newEvent); }
+  function clock() { const d = new Date(); document.getElementById('clock').textContent = d.toTimeString().slice(0, 8); }
+  buildAgents(); paintAll(); clock();
+  setInterval(() => { clock(); ORDER.forEach((id) => { paintAgent(id); paintSlot(id); }); }, 1000);
+
+  let timer = null;
+  document.getElementById('cycle').addEventListener('click', (e) => {
+    const on = e.currentTarget.getAttribute('aria-pressed') !== 'true'; e.currentTarget.setAttribute('aria-pressed', String(on));
+    clearInterval(timer); if (!on) return;
+    timer = setInterval(() => {
+      const id = ORDER[Math.floor(Math.random() * ORDER.length)];
+      st[id].i = (st[id].i + 1) % SCRIPT[id].length; st[id].since = Date.now(); st[id].tools += 1;
+      const [s, what, , target] = cur(id); const t = new Date().toTimeString().slice(0, 8);
+      EVENTS.unshift([t, id, s === 'permission' ? 'permiso' : s === 'error' ? 'error' : 'herramienta', what, target || '']);
+      paintAll(true);
+    }, 2600);
+  });
+  document.getElementById('calmBtn').addEventListener('click', (e) => { const on = document.body.classList.toggle('calm'); e.currentTarget.setAttribute('aria-pressed', String(on)); });
+  document.getElementById('needs').addEventListener('click', (e) => { const b = e.target.closest('[data-open]'); if (b) document.getElementById(`row-${b.dataset.open}`).scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+
+  /* ---------- vistas del prototipo ---------- */
+  document.querySelector('.proto-nav nav').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    document.querySelectorAll('.proto-nav nav button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    document.querySelectorAll('[data-view]').forEach((v) => v.classList.toggle('on', v.dataset.view === b.dataset.go));
+  });
+  const hash = location.hash.slice(1); if (hash) document.querySelector(`[data-go="${hash}"]`)?.click();
+})();
+</script>
+</body>
+</html>
